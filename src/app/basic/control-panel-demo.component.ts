@@ -17,7 +17,7 @@ import { ColumnMode } from 'projects/swimlane/ngx-datatable/src/public-api';
         [loadingIndicator]="loadingIndicator"
         [columns]="columns"
         [columnMode]="ColumnMode.force"
-        [headerHeight]="50"
+        [headerHeight]="90"
         [footerHeight]="50"
         rowHeight="auto"
         [reorderable]="reorderable"
