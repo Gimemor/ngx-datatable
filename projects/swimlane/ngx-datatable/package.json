@@ -1,5 +1,5 @@
 {
-  "name": "@swimlane/ngx-datatable",
+  "name": "ngx-datatable-gimefork",
   "version": "20.1.0",
   "description": "ngx-datatable is an Angular table grid component for presenting large and complex data.",
   "peerDependencies": {
@@ -10,10 +10,6 @@
   },
   "dependencies": {
     "tslib": "^2.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/swimlane/ngx-datatable.git"
   },
   "keywords": [
     "angularjs",
@@ -26,7 +22,7 @@
   "author": "Swimlane",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/swimlane/ngx-datatable/issues"
+    "url": "https://github.com/gimemor/ngx-datatable/issues"
   },
   "homepage": "https://github.com/swimlane/ngx-datatable#readme"
 }
