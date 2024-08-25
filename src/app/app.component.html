@@ -22,6 +22,9 @@
             <a href="#virtual-scroll" (click)="state = 'virtual-scroll'">10k Rows</a>
           </li>
           <li>
+            <a href="#control-panel" (click)="state = 'control-panel'">Control Panel</a>
+          </li>
+          <li>
             <a href="#full-screen" (click)="state = 'full-screen'">Full Screen</a>
           </li>
           <li>
@@ -196,6 +199,7 @@
   <content>
     <!-- Basic -->
     <basic-auto-demo *ngIf="!state"></basic-auto-demo>
+    <control-panel-demo *ngIf="state === 'control-panel'"></control-panel-demo>
     <basic-fixed-demo *ngIf="state === 'basic-fixed'"></basic-fixed-demo>
     <full-screen-demo *ngIf="state === 'full-screen'"></full-screen-demo>
     <inline-edit-demo *ngIf="state === 'inline-edit'"></inline-edit-demo>

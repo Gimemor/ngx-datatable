@@ -28,6 +28,9 @@ export * from './lib/components/columns/tree.directive';
 export * from './lib/components/row-detail/row-detail.directive';
 export * from './lib/components/row-detail/row-detail-template.directive';
 
+// Control Panel
+export * from './lib/components/control-panel/control-panel.directive';
+
 // directives
 export * from './lib/directives/draggable.directive';
 export * from './lib/directives/long-press.directive';

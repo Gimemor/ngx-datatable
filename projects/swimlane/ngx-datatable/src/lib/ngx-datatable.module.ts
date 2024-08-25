@@ -31,6 +31,7 @@ import { DataTableColumnCellTreeToggle } from './components/columns/tree.directi
 import { DatatableFooterDirective } from './components/footer/footer.directive';
 import { DatatableGroupHeaderTemplateDirective } from './components/body/body-group-header-template.directive';
 import { DataTableSummaryRowComponent } from './components/body/summary/summary-row.component';
+import { DataTableControlPanelDirective } from './components/control-panel/control-panel.directive';
 
 @NgModule({
   imports: [CommonModule],
@@ -63,7 +64,8 @@ import { DataTableSummaryRowComponent } from './components/body/summary/summary-
     DataTableColumnCellTreeToggle,
     DatatableFooterDirective,
     DatatableGroupHeaderTemplateDirective,
-    DataTableSummaryRowComponent
+    DataTableSummaryRowComponent,
+    DataTableControlPanelDirective
   ],
   exports: [
     DatatableComponent,
@@ -77,7 +79,8 @@ import { DataTableSummaryRowComponent } from './components/body/summary/summary-
     DataTableFooterTemplateDirective,
     DatatableFooterDirective,
     DataTablePagerComponent,
-    DatatableGroupHeaderTemplateDirective
+    DatatableGroupHeaderTemplateDirective,
+    DataTableControlPanelDirective
   ]
 })
 export class NgxDatatableModule {

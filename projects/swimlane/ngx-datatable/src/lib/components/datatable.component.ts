@@ -45,6 +45,7 @@ import { DimensionsHelper } from '../services/dimensions-helper.service';
 import { throttleable } from '../utils/throttle';
 import { forceFillColumnWidths, adjustColumnWidths } from '../utils/math';
 import { sortRows } from '../utils/sort';
+import { DataTableControlPanelDirective } from './control-panel/control-panel.directive';
 
 @Component({
   selector: 'ngx-datatable',
@@ -573,6 +574,12 @@ export class DatatableComponent implements OnInit, DoCheck, AfterViewInit {
    */
   @ContentChild(DatatableRowDetailDirective)
   rowDetail: DatatableRowDetailDirective;
+
+  /**
+   * Control Panel template gathered from the ContentChild
+   */
+  @ContentChild(DataTableControlPanelDirective)
+  controlPanel: DataTableControlPanelDirective;
 
   /**
    * Group Header templates gathered from the ContentChild

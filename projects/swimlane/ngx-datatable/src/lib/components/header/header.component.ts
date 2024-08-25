@@ -6,13 +6,15 @@ import {
   HostBinding,
   ChangeDetectorRef,
   ChangeDetectionStrategy,
-  OnDestroy
+  OnDestroy,
+  TemplateRef
 } from '@angular/core';
 import { columnsByPin, columnGroupWidths, columnsByPinArr } from '../../utils/column';
 import { SortType } from '../../types/sort.type';
 import { SelectionType } from '../../types/selection.type';
 import { DataTableColumnDirective } from '../columns/column.directive';
 import { translateXY } from '../../utils/translate';
+import { DataTableControlPanelDirective } from '../control-panel/control-panel.directive';
 
 @Component({
   selector: 'datatable-header',
@@ -65,6 +67,9 @@ import { translateXY } from '../../utils/translate';
         </datatable-header-cell>
       </div>
     </div>
+    <div class="datatable-control-panel" *ngIf="controlPanelRef?.template">
+      <div [ngTemplateOutlet]="controlPanelRef.template" [ngTemplateOutletContext]=""></div>
+    </div>
   `,
   host: {
     class: 'datatable-header'
@@ -101,7 +106,7 @@ export class DataTableHeaderComponent implements OnDestroy {
   @Input() allRowsSelected: boolean;
   @Input() selectionType: SelectionType;
   @Input() reorderable: boolean;
-
+  @Input() controlPanelRef?: DataTableControlPanelDirective;
   dragEventTarget: any;
 
   @HostBinding('style.height')
