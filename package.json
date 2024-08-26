@@ -7,13 +7,13 @@
     "build": "ng build",
     "build:lib:prod": "ng build @swimlane/ngx-datatable --configuration production",
     "copy-files": "cp README.md dist/swimlane/ngx-datatable/README.md && cp LICENSE dist/swimlane/ngx-datatable/LICENSE && cpx \"src/assets/**/*\" \"dist/swimlane/ngx-datatable/assets\" && cpx \"projects/swimlane/ngx-datatable/src/lib/themes/**/*\" \"dist/swimlane/ngx-datatable/themes\"",
-    "build:css": "scss-bundle  -c ./scss-bundle.config.json && node-sass -o dist/swimlane/ngx-datatable/themes dist/swimlane/ngx-datatable/themes && node-sass -o dist/swimlane/ngx-datatable dist/swimlane/ngx-datatable",
-    "test": "run-p lint test:unit",
+    "build:css": "scss-bundle  -c ./scss-bundle.config.json &&  sass dist/swimlane/ngx-datatable/themes:dist/swimlane/ngx-datatable/themes && sass dist/swimlane/ngx-datatable:dist/swimlane/ngx-datatable",
+    "test": "run-p test:unit",
     "test:unit": "ng test @swimlane/ngx-datatable --watch=false",
     "test:watch": "ng test @swimlane/ngx-datatable",
     "test:ci": "ng test @swimlane/ngx-datatable --watch=false --progress=false --browsers=ChromeHeadlessCI",
-    "ci": "run-s lint prettier:ci test:ci",
-    "lint": "ng lint",
+    "ci": "run-s prettier:ci test:ci",
+    "lint": "eslint",
     "e2e": "ng e2e",
     "prettier": "prettier --write \"{src,projects}/*.{js,ts,html,scss,css,md,json}\"",
     "prettier:ci": "prettier --check \"{src,projects}/*.{js,ts,html,scss,css,md,json}\"",
@@ -57,7 +57,7 @@
     "codelyzer": "^6.0.2",
     "cpx": "^1.5.0",
     "cross-env": "^7.0.3",
-    "eslint": "^9.9.1",
+    "eslint": "^9.9.0",
     "globals": "^15.9.0",
     "husky": "^4.3.8",
     "jasmine": "^3.9.0",
@@ -79,7 +79,7 @@
     "tslint": "~6.1.0",
     "tslint-config-prettier": "^1.17.0",
     "typescript": "~5.4.5",
-    "typescript-eslint": "^8.2.0"
+    "typescript-eslint": "8.1.0"
   },
   "husky": {
     "hooks": {
