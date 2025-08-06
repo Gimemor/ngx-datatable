@@ -12035,9 +12035,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ngx-datatable@workspace:.":
+"ngx-datatable-gimefork@workspace:.":
   version: 0.0.0-use.local
-  resolution: "ngx-datatable@workspace:."
+  resolution: "ngx-datatable-gimefork@workspace:."
   dependencies:
     "@angular-devkit/build-angular": "npm:^20.0.4"
     "@angular-devkit/core": "npm:^20.0.4"

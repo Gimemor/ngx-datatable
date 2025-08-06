@@ -41,7 +41,7 @@ import { DataService } from '../data.service';
           rowHeight="auto"
           [limit]="5"
           [selected]="selected"
-          [selectionType]="SelectionType.multiClick"
+          [selectionType]="SelectionType.multi"
           [selectAllRowsOnPage]="false"
           [displayCheck]="allowSelection"
           [selectCheck]="allowSelection"

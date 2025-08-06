@@ -17,7 +17,7 @@ export * from './lib/components/columns/tree.directive';
 export * from './lib/components/row-detail/row-detail.directive';
 export * from './lib/components/row-detail/row-detail-template.directive';
 export * from './lib/components/body/body-row-def.component';
-
+export * from './lib/components/footer/pager.component';
 // directives
 export * from './lib/directives/disable-row.directive';
 

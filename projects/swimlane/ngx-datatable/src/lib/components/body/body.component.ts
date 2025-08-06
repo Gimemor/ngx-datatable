@@ -881,6 +881,10 @@ export class DataTableBodyComponent<TRow extends Row = any> implements OnInit, O
     const multiClick = this.selectionType === SelectionType.multiClick;
     let selected: TRow[] = [];
 
+    const multiselect =
+      (((event as KeyboardEvent).ctrlKey || (event as KeyboardEvent).metaKey) && multi) ||
+      (event.target as any).type == 'checkbox';
+
     // TODO: this code needs cleanup. Casting it to KeyboardEvent is not correct as it could also be other types.
     if (multi || chkbox || multiClick) {
       if ((event as KeyboardEvent).shiftKey) {
@@ -895,7 +899,8 @@ export class DataTableBodyComponent<TRow extends Row = any> implements OnInit, O
         (event as KeyboardEvent).ctrlKey ||
         (event as KeyboardEvent).metaKey ||
         multiClick ||
-        chkbox
+        chkbox ||
+        multiselect
       ) {
         selected = selectRows([...this.selected], row, this.getRowSelectedIdx.bind(this));
       } else {
@@ -924,10 +929,9 @@ export class DataTableBodyComponent<TRow extends Row = any> implements OnInit, O
   }
 
   onActivate(model: ActivateEvent<TRow>, index: number): void {
+    model.event.stopPropagation();
     const { type, event, row } = model;
-    const chkbox = this.selectionType === SelectionType.checkbox;
-    const select =
-      (!chkbox && (type === 'click' || type === 'dblclick')) || (chkbox && type === 'checkbox');
+    const select = type === 'click' || type === 'dblclick' || type === 'checkbox';
 
     if (select) {
       this.selectRow(event, index, row);
