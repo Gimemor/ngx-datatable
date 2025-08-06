@@ -116,6 +116,12 @@
               "devServerTarget": "ngx-datatable:serve:production"
             }
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["./src/**/*.ts", "./projects/**/*.html"]
+          }
         }
       }
     },

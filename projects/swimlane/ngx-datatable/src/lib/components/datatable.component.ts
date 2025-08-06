@@ -74,6 +74,7 @@ import {
   TableColumnInternal
 } from '../types/internal.types';
 import { NGX_DATATABLE_CONFIG, NgxDatatableConfig } from '../ngx-datatable.config';
+import { DataTableControlPanelDirective } from './control-panel/control-panel.directive';
 
 @Component({
   selector: 'ngx-datatable',
@@ -634,6 +635,12 @@ export class DatatableComponent<TRow extends Row = any>
    */
   @ContentChild(DatatableRowDetailDirective)
   rowDetail?: DatatableRowDetailDirective;
+
+  /**
+   * Control Panel template gathered from the ContentChild
+   */
+  @ContentChild(DataTableControlPanelDirective)
+  controlPanel: DataTableControlPanelDirective;
 
   /**
    * Group Header templates gathered from the ContentChild

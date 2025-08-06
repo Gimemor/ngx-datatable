@@ -21,7 +21,7 @@ import {
   SortPropDir,
   SortType
 } from '../../types/public.types';
-import { NgClass, NgStyle } from '@angular/common';
+import { CommonModule, NgClass, NgStyle } from '@angular/common';
 import { ScrollbarHelper } from '../../services/scrollbar-helper.service';
 import {
   ColumnResizeEventInternal,
@@ -36,6 +36,7 @@ import { DraggableDirective } from '../../directives/draggable.directive';
 import { LongPressDirective } from '../../directives/long-press.directive';
 import { DataTableHeaderCellComponent } from './header-cell.component';
 import { OrderableDirective } from '../../directives/orderable.directive';
+import { DataTableControlPanelDirective } from '../control-panel/control-panel.directive';
 
 @Component({
   selector: 'datatable-header',
@@ -91,6 +92,11 @@ import { OrderableDirective } from '../../directives/orderable.directive';
       </div>
       } }
     </div>
+    @if (controlPanelRef?.template) {
+    <div class="datatable-control-panel">
+      <div [ngTemplateOutlet]="controlPanelRef.template" [ngTemplateOutletContext]=""></div>
+    </div>
+    }
   `,
   host: {
     class: 'datatable-header'
@@ -103,6 +109,7 @@ import { OrderableDirective } from '../../directives/orderable.directive';
     DataTableHeaderCellComponent,
     LongPressDirective,
     DraggableDirective,
+    CommonModule,
     NgClass
   ]
 })
@@ -139,6 +146,7 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
   @Input() selectionType?: SelectionType;
   @Input() reorderable?: boolean;
   @Input() verticalScrollVisible = false;
+  @Input() controlPanelRef?: DataTableControlPanelDirective;
 
   dragEventTarget?: MouseEvent | TouchEvent;
 

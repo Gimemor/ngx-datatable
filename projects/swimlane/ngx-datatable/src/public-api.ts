@@ -18,6 +18,10 @@ export * from './lib/components/row-detail/row-detail.directive';
 export * from './lib/components/row-detail/row-detail-template.directive';
 export * from './lib/components/body/body-row-def.component';
 export * from './lib/components/footer/pager.component';
+export * from './lib/components/control-panel/control-panel.directive';
+
+// Control Panel
+export * from './lib/components/control-panel/control-panel.directive';
 // directives
 export * from './lib/directives/disable-row.directive';
 
