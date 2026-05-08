@@ -9,6 +9,7 @@ export * from './lib/components/body/body-group-header.directive';
 export * from './lib/components/body/body-group-header-template.directive';
 export * from './lib/components/footer/footer.directive';
 export * from './lib/components/footer/footer-template.directive';
+export * from './lib/components/footer/pager.component';
 export * from './lib/components/columns/column.directive';
 export * from './lib/components/columns/column-header.directive';
 export * from './lib/components/columns/column-cell.directive';
@@ -24,9 +25,6 @@ export * from './lib/directives/disable-row.directive';
 // types
 export * from './lib/types/public.types';
 export * from './lib/types/table-column.type';
-
-// services
-export * from './lib/services/column-changes.service';
 
 // utilis
 export * from './lib/utils/column-helper';

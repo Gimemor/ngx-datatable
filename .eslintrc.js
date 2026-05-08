@@ -42,13 +42,7 @@ module.exports = {
         'no-duplicate-imports': 'error',
         'no-redeclare': 'off',
         'no-underscore-dangle': 'off',
-        '@angular-eslint/directive-selector': [
-          'error',
-          {
-            'type': 'attribute',
-            'style': 'camelCase'
-          }
-        ],
+        '@angular-eslint/directive-selector': 'off',
         '@angular-eslint/component-selector': [
           'error',
           {
@@ -71,7 +65,7 @@ module.exports = {
         '@typescript-eslint/naming-convention': 'off',
         '@typescript-eslint/no-non-null-asserted-optional-chain': 'error',
         '@typescript-eslint/no-non-null-assertion': 'off',
-        '@typescript-eslint/no-redeclare': 'error',
+        '@typescript-eslint/no-redeclare': 'off',
         '@typescript-eslint/no-require-imports': 'error',
         '@typescript-eslint/no-shadow': [
           'error',

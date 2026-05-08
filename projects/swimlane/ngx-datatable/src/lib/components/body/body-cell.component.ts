@@ -1,322 +1,204 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
+  computed,
   DoCheck,
   ElementRef,
-  EventEmitter,
-  HostBinding,
-  HostListener,
   inject,
-  Input,
-  Output
+  input,
+  linkedSignal,
+  output,
+  signal
 } from '@angular/core';
 
-import { Keys } from '../../utils/keys';
-import {
-  ActivateEvent,
-  CellContext,
-  Row,
-  RowOrGroup,
-  SortDirection,
-  SortPropDir,
-  TreeStatus
-} from '../../types/public.types';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgxDatatableConfig } from '../../ngx-datatable.config';
 import { CellActiveEvent, RowIndex, TableColumnInternal } from '../../types/internal.types';
+import { ActivateEvent, CellContext, Row, RowOrGroup, TreeStatus } from '../../types/public.types';
+import { TableColumn } from '../../types/table-column.type';
+import { toPublicColumn } from '../../utils/column-helper';
+import { ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP, ENTER } from '../../utils/keys';
 
 @Component({
   selector: 'datatable-body-cell',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgTemplateOutlet],
   template: `
+    @let column = this.column();
+    @let row = this.row();
     <div class="datatable-body-cell-label" [style.margin-left.px]="calcLeftMargin(column, row)">
-      @if (column.checkboxable && (!displayCheck || displayCheck(row, column, value))) {
-      <label class="datatable-checkbox">
-        <input
-          type="checkbox"
-          [disabled]="disabled"
-          [checked]="isSelected"
-          (click)="onCheckboxChange($event)"
+      @let displayCheck = this.displayCheck();
+      @if (column.checkboxable && (!displayCheck || displayCheck(row, publicColumn(), value()))) {
+        <label class="datatable-checkbox">
+          <input
+            type="checkbox"
+            [attr.aria-label]="ariaRowCheckboxMessage()"
+            [disabled]="disabled()"
+            [checked]="isSelected()"
+            (click)="onCheckboxChange($event)"
+          />
+        </label>
+      }
+      @if (column.isTreeColumn) {
+        @if (!column.treeToggleTemplate) {
+          @let treeStatus = this.treeStatus() ?? 'collapsed';
+          <button
+            class="datatable-tree-button"
+            type="button"
+            [disabled]="treeStatus === 'disabled'"
+            [attr.aria-label]="treeStatus"
+            (click)="onTreeAction()"
+          >
+            <span>
+              @if (treeStatus === 'loading') {
+                <i [class]="cssClasses().treeStatusLoading ?? 'icon datatable-icon-collapse'"></i>
+              }
+              @if (treeStatus === 'collapsed') {
+                <i [class]="cssClasses().treeStatusCollapsed ?? 'icon datatable-icon-up'"></i>
+              }
+              @if (treeStatus === 'expanded' || treeStatus === 'disabled') {
+                <i [class]="cssClasses().treeStatusExpanded ?? 'icon datatable-icon-down'"></i>
+              }
+            </span>
+          </button>
+        } @else {
+          <ng-template
+            [ngTemplateOutlet]="column.treeToggleTemplate"
+            [ngTemplateOutletContext]="{ cellContext: cellContext() }"
+          />
+        }
+      }
+      @if (!column.cellTemplate) {
+        @if (column.bindAsUnsafeHtml) {
+          <span [title]="sanitizedValue()" [innerHTML]="value()"> </span>
+        } @else {
+          <span [title]="sanitizedValue()">{{ value() }}</span>
+        }
+      } @else {
+        <ng-template
+          [ngTemplateOutlet]="column.cellTemplate"
+          [ngTemplateOutletContext]="cellContext()"
         />
-      </label>
-      } @if (column.isTreeColumn) { @if (!column.treeToggleTemplate) {
-      <button
-        class="datatable-tree-button"
-        [disabled]="treeStatus === 'disabled'"
-        (click)="onTreeAction()"
-        [attr.aria-label]="treeStatus"
-      >
-        <span>
-          @if (treeStatus === 'loading') {
-          <i class="icon datatable-icon-collapse"></i>
-          } @if (treeStatus === 'collapsed') {
-          <i class="icon datatable-icon-up"></i>
-          } @if (treeStatus === 'expanded' || treeStatus === 'disabled') {
-          <i class="icon datatable-icon-down"></i>
-          }
-        </span>
-      </button>
-      } @else {
-      <ng-template
-        [ngTemplateOutlet]="column.treeToggleTemplate"
-        [ngTemplateOutletContext]="{ cellContext: cellContext }"
-      >
-      </ng-template>
-      } } @if (!column.cellTemplate) { @if (column.bindAsUnsafeHtml) {
-      <span [title]="sanitizedValue" [innerHTML]="value"> </span>
-      } @else {
-      <span [title]="sanitizedValue">{{ value }}</span>
-      } } @else {
-      <ng-template [ngTemplateOutlet]="column.cellTemplate" [ngTemplateOutletContext]="cellContext">
-      </ng-template>
       }
     </div>
   `,
   styleUrl: './body-cell.component.scss',
-  imports: [NgTemplateOutlet]
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    'class': 'datatable-body-cell',
+    '[class]': 'columnCssClasses()',
+    '[class.active]': 'isFocused() && !disabled()',
+    '[class.row-disabled]': 'disabled()',
+    '[style.width.px]': 'column().width()',
+    '[style.minWidth.px]': 'column().minWidth',
+    '[style.maxWidth.px]': 'column().maxWidth',
+    '[style.height]': 'height()',
+    '(focus)': 'onFocus()',
+    '(blur)': 'onBlur()',
+    '(click)': 'onClick($event)',
+    '(dblclick)': 'onDblClick($event)',
+    '(keydown)': 'onKeyDown($event)'
+  }
 })
 export class DataTableBodyCellComponent<TRow extends Row = any> implements DoCheck {
-  private cd = inject(ChangeDetectorRef);
+  readonly displayCheck = input<(row: TRow, column: TableColumn, value: any) => boolean>();
 
-  @Input() displayCheck?: (row: TRow, column: TableColumnInternal, value: any) => boolean;
+  readonly disabled = input(false, { transform: booleanAttribute });
 
-  @Input() set disabled(value: boolean | undefined) {
-    this.cellContext.disabled = value;
-    this._disabled = value;
-  }
+  readonly group = input<TRow[]>();
 
-  get disabled(): boolean | undefined {
-    return this._disabled;
-  }
+  readonly rowHeight = input<number>(0);
 
-  @Input() set group(group: TRow[] | undefined) {
-    this._group = group;
-    this.cellContext.group = group;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
+  readonly isSelected = input(false, { transform: booleanAttribute });
 
-  get group() {
-    return this._group;
-  }
+  readonly rowIndex = input<RowIndex>();
 
-  @Input() set rowHeight(val: number) {
-    this._rowHeight = val;
-    this.cellContext.rowHeight = val;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
+  readonly column = input.required<TableColumnInternal>();
 
-  get rowHeight() {
-    return this._rowHeight;
-  }
+  readonly row = input.required<TRow>();
 
-  @Input() set isSelected(val: boolean | undefined) {
-    this._isSelected = val;
-    this.cellContext.isSelected = val;
-    this.cd.markForCheck();
-  }
+  readonly treeStatus = input<TreeStatus | undefined>('collapsed');
 
-  get isSelected(): boolean | undefined {
-    return this._isSelected;
-  }
+  readonly ariaRowCheckboxMessage = input.required<string>();
 
-  @Input() set expanded(val: boolean | undefined) {
-    this._expanded = val;
-    this.cellContext.expanded = val;
-    this.cd.markForCheck();
-  }
+  readonly cssClasses = input.required<Partial<Required<NgxDatatableConfig>['cssClasses']>>();
 
-  get expanded(): boolean | undefined {
-    return this._expanded;
-  }
+  readonly expanded = input(false, { transform: booleanAttribute });
 
-  @Input() set rowIndex(val: RowIndex) {
-    this._rowIndex = val;
-    this.cellContext.rowIndex = val?.index;
-    this.cellContext.rowInGroupIndex = val?.indexInGroup;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
+  readonly activate = output<CellActiveEvent<TRow>>();
 
-  get rowIndex(): RowIndex {
-    return this._rowIndex;
-  }
+  readonly treeAction = output<TRow>();
 
-  @Input() set column(column: TableColumnInternal) {
-    this._column = column;
-    this.cellContext.column = column;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
+  protected readonly publicColumn = computed(() => toPublicColumn(this.column()));
 
-  get column(): TableColumnInternal {
-    return this._column;
-  }
-
-  @Input() set row(row: TRow) {
-    this._row = row;
-    this.cellContext.row = row;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
-
-  get row(): TRow {
-    return this._row;
-  }
-
-  @Input() set sorts(val: SortPropDir[]) {
-    this._sorts = val;
-    this.sortDir = this.calcSortDir(val);
-  }
-
-  get sorts(): SortPropDir[] {
-    return this._sorts;
-  }
-
-  @Input() set treeStatus(status: TreeStatus | undefined) {
-    if (
-      status !== 'collapsed' &&
-      status !== 'expanded' &&
-      status !== 'loading' &&
-      status !== 'disabled'
-    ) {
-      this._treeStatus = 'collapsed';
-    } else {
-      this._treeStatus = status;
+  protected readonly columnCssClasses = computed(() => {
+    const column = this.column();
+    if (!column.cellClass) {
+      return [];
     }
-    this.cellContext.treeStatus = this._treeStatus;
-    this.checkValueUpdates();
-    this.cd.markForCheck();
-  }
-
-  get treeStatus(): TreeStatus | undefined {
-    return this._treeStatus;
-  }
-
-  @Output() activate = new EventEmitter<CellActiveEvent<TRow>>();
-
-  @Output() treeAction: EventEmitter<any> = new EventEmitter();
-
-  @HostBinding('class')
-  get columnCssClasses(): string {
-    let cls = 'datatable-body-cell';
-    if (this.column.cellClass) {
-      if (typeof this.column.cellClass === 'string') {
-        cls += ' ' + this.column.cellClass;
-      } else if (typeof this.column.cellClass === 'function') {
-        const res = this.column.cellClass({
-          row: this.row,
-          group: this.group,
-          column: this.column,
-          value: this.value,
-          rowHeight: this.rowHeight
-        });
-
-        if (typeof res === 'string') {
-          cls += ' ' + res;
-        } else if (typeof res === 'object') {
-          const keys = Object.keys(res);
-          for (const k of keys) {
-            if (res[k] === true) {
-              cls += ` ${k}`;
-            }
-          }
-        }
-      }
+    if (typeof column.cellClass === 'string') {
+      return column.cellClass;
     }
-    if (!this.sortDir) {
-      cls += ' sort-active';
-    }
-    if (this.isFocused && !this._disabled) {
-      cls += ' active';
-    }
-    if (this.sortDir === SortDirection.asc) {
-      cls += ' sort-asc';
-    }
-    if (this.sortDir === SortDirection.desc) {
-      cls += ' sort-desc';
-    }
-    if (this._disabled) {
-      cls += ' row-disabled';
-    }
+    return column.cellClass({
+      row: this.row(),
+      group: this.group(),
+      column: this.publicColumn(),
+      value: this.value(),
+      rowHeight: this.rowHeight()
+    });
+  });
 
-    return cls;
-  }
-
-  @HostBinding('style.width.px')
-  get width(): number {
-    return this.column.width;
-  }
-
-  @HostBinding('style.minWidth.px')
-  get minWidth(): number | undefined {
-    return this.column.minWidth;
-  }
-
-  @HostBinding('style.maxWidth.px')
-  get maxWidth(): number | undefined {
-    return this.column.maxWidth;
-  }
-
-  @HostBinding('style.height')
-  get height(): string | number {
-    const height = this.rowHeight;
+  protected readonly height = computed(() => {
+    const height = this.rowHeight();
     if (isNaN(height)) {
       return height;
     }
     return height + 'px';
-  }
+  });
 
-  sanitizedValue!: string;
-  value: any;
-  sortDir?: SortDirection;
-  isFocused = false;
-
-  cellContext: CellContext<TRow>;
-
-  private _isSelected?: boolean;
-  private _sorts!: SortPropDir[];
-  private _column!: TableColumnInternal;
-  private _row!: TRow;
-  private _group?: TRow[];
-  private _rowHeight!: number;
-  private _rowIndex!: RowIndex;
-  private _expanded?: boolean;
-  private _element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private _treeStatus?: TreeStatus;
-  private _disabled?: boolean;
-
-  constructor() {
-    this.cellContext = {
+  protected readonly sanitizedValue = computed(() => {
+    const value = this.value();
+    return value !== null && value !== undefined ? this.stripHtml(value) : value;
+  });
+  readonly value = linkedSignal(() => this.getComputedValue());
+  protected readonly cellContext = computed<CellContext<TRow>>(() => {
+    return {
       onCheckboxChangeFn: (event: Event) => this.onCheckboxChange(event),
       activateFn: (event: ActivateEvent<TRow>) => this.activate.emit(event),
-      row: this.row,
-      group: this.group,
-      value: this.value,
-      column: this.column,
-      rowHeight: this.rowHeight,
-      isSelected: this.isSelected,
-      rowIndex: this.rowIndex?.index,
-      rowInGroupIndex: this.rowIndex?.indexInGroup,
-      treeStatus: this.treeStatus,
-      disabled: this._disabled,
+      row: this.row(),
+      group: this.group(),
+      value: this.value(),
+      column: this.publicColumn(),
+      rowHeight: this.rowHeight(),
+      isSelected: this.isSelected(),
+      rowIndex: this.rowIndex()?.index ?? 0,
+      rowInGroupIndex: this.rowIndex()?.indexInGroup,
+      treeStatus: this.treeStatus() ?? 'collapsed',
+      disabled: this.disabled(),
+      expanded: this.expanded(),
       onTreeAction: () => this.onTreeAction()
     };
-  }
+  });
+
+  protected readonly isFocused = signal(false);
+  private _element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   ngDoCheck(): void {
-    this.checkValueUpdates();
+    const value = this.getComputedValue();
+    if (value !== this.value()) {
+      this.value.set(value);
+    }
   }
 
-  checkValueUpdates(): void {
+  private getComputedValue(): any {
     let value = '';
-
-    if (!this.row || !this.column || this.column.prop == undefined) {
+    const column = this.column();
+    const row = this.row();
+    if (!row || column.prop == undefined) {
       value = '';
     } else {
-      const val = this.column.$$valueGetter(this.row, this.column.prop);
-      const userPipe = this.column.pipe;
+      const val = column.$$valueGetter(row, column.prop);
+      const userPipe = column.pipe;
 
       if (userPipe) {
         value = userPipe.transform(val);
@@ -324,65 +206,53 @@ export class DataTableBodyCellComponent<TRow extends Row = any> implements DoChe
         value = val;
       }
     }
-
-    if (this.value !== value) {
-      this.value = value;
-      this.cellContext.value = value;
-      this.cellContext.disabled = this._disabled;
-      this.sanitizedValue = value !== null && value !== undefined ? this.stripHtml(value) : value;
-      this.cd.markForCheck();
-    }
+    return value;
   }
 
-  @HostListener('focus')
-  onFocus(): void {
-    this.isFocused = true;
+  protected onFocus(): void {
+    this.isFocused.set(true);
   }
 
-  @HostListener('blur')
-  onBlur(): void {
-    this.isFocused = false;
+  protected onBlur(): void {
+    this.isFocused.set(false);
   }
 
-  @HostListener('click', ['$event'])
-  onClick(event: MouseEvent): void {
+  protected onClick(event: MouseEvent): void {
     this.activate.emit({
       type: 'click',
       event,
-      row: this.row,
-      group: this.group,
-      rowHeight: this.rowHeight,
-      column: this.column,
-      value: this.value,
+      row: this.row(),
+      group: this.group(),
+      rowHeight: this.rowHeight(),
+      column: this.publicColumn(),
+      value: this.value(),
       cellElement: this._element
     });
   }
 
-  @HostListener('dblclick', ['$event'])
-  onDblClick(event: MouseEvent): void {
+  protected onDblClick(event: MouseEvent): void {
     this.activate.emit({
       type: 'dblclick',
       event,
-      row: this.row,
-      group: this.group,
-      rowHeight: this.rowHeight,
-      column: this.column,
-      value: this.value,
+      row: this.row(),
+      group: this.group(),
+      rowHeight: this.rowHeight(),
+      column: this.publicColumn(),
+      value: this.value(),
       cellElement: this._element
     });
   }
 
-  @HostListener('keydown', ['$event'])
-  onKeyDown(event: KeyboardEvent): void {
+  protected onKeyDown(event: KeyboardEvent): void {
     const key = event.key;
     const isTargetCell = event.target === this._element;
 
     const isAction =
-      key === Keys.return ||
-      key === Keys.down ||
-      key === Keys.up ||
-      key === Keys.left ||
-      key === Keys.right;
+      key === ENTER ||
+      key === ARROW_DOWN ||
+      key === ARROW_UP ||
+      key === ARROW_LEFT ||
+      key === ARROW_RIGHT;
 
     if (isAction && isTargetCell) {
       event.preventDefault();
@@ -391,11 +261,11 @@ export class DataTableBodyCellComponent<TRow extends Row = any> implements DoChe
       this.activate.emit({
         type: 'keydown',
         event,
-        row: this.row,
-        group: this.group,
-        rowHeight: this.rowHeight,
-        column: this.column,
-        value: this.value,
+        row: this.row(),
+        group: this.group(),
+        rowHeight: this.rowHeight(),
+        column: this.publicColumn(),
+        value: this.value(),
         cellElement: this._element
       });
     }
@@ -405,24 +275,14 @@ export class DataTableBodyCellComponent<TRow extends Row = any> implements DoChe
     this.activate.emit({
       type: 'checkbox',
       event,
-      row: this.row,
-      group: this.group,
-      rowHeight: this.rowHeight,
-      column: this.column,
-      value: this.value,
+      row: this.row(),
+      group: this.group(),
+      rowHeight: this.rowHeight(),
+      column: this.publicColumn(),
+      value: this.value(),
       cellElement: this._element,
       treeStatus: 'collapsed'
     });
-  }
-
-  calcSortDir(sorts: SortPropDir[]): SortDirection | undefined {
-    if (!sorts) {
-      return undefined;
-    }
-
-    const sort = sorts.find(s => s.prop === this.column.prop);
-
-    return sort?.dir as SortDirection;
   }
 
   stripHtml(html: string): string {
@@ -432,12 +292,12 @@ export class DataTableBodyCellComponent<TRow extends Row = any> implements DoChe
     return html.replace(/<\/?[^>]+(>|$)/g, '');
   }
 
-  onTreeAction() {
-    this.treeAction.emit(this.row);
+  protected onTreeAction() {
+    this.treeAction.emit(this.row());
   }
 
   calcLeftMargin(column: TableColumnInternal, row: RowOrGroup<TRow>): number {
-    const levelIndent = column.treeLevelIndent != null ? column.treeLevelIndent : 50;
+    const levelIndent = column.treeLevelIndent ?? 50;
     return column.isTreeColumn ? (row as TRow).level! * levelIndent : 0;
   }
 }

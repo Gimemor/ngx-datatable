@@ -1,11 +1,11 @@
-import { getterForProp } from './column-prop-getters';
-import { TableColumnProp } from '../types/table-column.type';
 import { Row } from '../types/public.types';
+import { TableColumnProp } from '../types/table-column.type';
+import { getterForProp } from './column-prop-getters';
 
 export type OptionalValueGetter = ((row: any) => any) | undefined;
-export function optionalGetterForProp(prop: TableColumnProp | undefined): OptionalValueGetter {
+export const optionalGetterForProp = (prop: TableColumnProp | undefined): OptionalValueGetter => {
   return prop ? row => getterForProp(prop)(row, prop) : undefined;
-}
+};
 
 /**
  * This functions rearrange items by their parents
@@ -43,11 +43,11 @@ export function optionalGetterForProp(prop: TableColumnProp | undefined): Option
  * @param rows
  *
  */
-export function groupRowsByParents<TRow extends Row>(
+export const groupRowsByParents = <TRow extends Row>(
   rows: (TRow | undefined)[],
   from?: OptionalValueGetter,
   to?: OptionalValueGetter
-): (TRow | undefined)[] {
+): (TRow | undefined)[] => {
   if (from && to) {
     const treeRows = rows.filter(row => !!row).map(row => new TreeNode(row));
     const uniqIDs = new Map(treeRows.map(node => [to(node.row), node]));
@@ -70,7 +70,7 @@ export function groupRowsByParents<TRow extends Row>(
   } else {
     return rows;
   }
-}
+};
 
 class TreeNode<TRow extends Row> {
   public row: TRow;
@@ -90,3 +90,30 @@ class TreeNode<TRow extends Row> {
     }
   }
 }
+
+export const expandToRow = <TRow extends Row>(
+  targetRow: TRow,
+  rows: (TRow | undefined)[],
+  from?: OptionalValueGetter,
+  to?: OptionalValueGetter
+) => {
+  if (from && to) {
+    const uniqIDs = new Map(rows.filter(row => !!row).map(node => [to(node), node]));
+    const visitedRowIds = new Set<unknown>();
+    let currentRow: TRow | undefined = targetRow;
+
+    while (currentRow) {
+      const currentRowId = to(currentRow);
+      if (visitedRowIds.has(currentRowId)) {
+        // cycle detected, abort to avoid an infinite loop
+        break;
+      }
+      visitedRowIds.add(currentRowId);
+
+      if (currentRow.treeStatus === 'collapsed') {
+        currentRow.treeStatus = 'expanded';
+      }
+      currentRow = uniqIDs.get(from(currentRow));
+    }
+  }
+};

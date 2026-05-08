@@ -1,14 +1,15 @@
 import { Component, inject } from '@angular/core';
 import {
-  ColumnMode,
   DataTableColumnDirective,
   DatatableComponent
 } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { FullEmployee } from '../data.model';
 import { DataService } from '../data.service';
 
 @Component({
   selector: 'tabs-demo',
+  imports: [DatatableComponent, DataTableColumnDirective],
   template: `
     <div>
       <h3>
@@ -38,41 +39,40 @@ import { DataService } from '../data.service';
           <h4>hidden Table</h4>
           <ngx-datatable
             class="material"
+            columnMode="force"
             [rows]="rows"
-            [columnMode]="ColumnMode.force"
             [headerHeight]="50"
             [footerHeight]="50"
             [rowHeight]="50"
             [scrollbarV]="true"
           >
-            <ngx-datatable-column name="Name" [width]="200"></ngx-datatable-column>
-            <ngx-datatable-column name="Gender" [width]="300"></ngx-datatable-column>
-            <ngx-datatable-column name="Age" [width]="80"></ngx-datatable-column>
+            <ngx-datatable-column name="Name" [width]="200" />
+            <ngx-datatable-column name="Gender" [width]="300" />
+            <ngx-datatable-column name="Age" [width]="80" />
           </ngx-datatable>
         </div>
 
         @if (tab3) {
-        <div>
-          <h4>ngIf Table</h4>
-          <ngx-datatable
-            class="material"
-            [rows]="rows"
-            [columnMode]="ColumnMode.force"
-            [headerHeight]="50"
-            [footerHeight]="50"
-            [rowHeight]="50"
-            [scrollbarV]="true"
-          >
-            <ngx-datatable-column name="Name" [width]="200"></ngx-datatable-column>
-            <ngx-datatable-column name="Gender" [width]="300"></ngx-datatable-column>
-            <ngx-datatable-column name="Age" [width]="80"></ngx-datatable-column>
-          </ngx-datatable>
-        </div>
+          <div>
+            <h4>ngIf Table</h4>
+            <ngx-datatable
+              class="material"
+              columnMode="force"
+              [rows]="rows"
+              [headerHeight]="50"
+              [footerHeight]="50"
+              [rowHeight]="50"
+              [scrollbarV]="true"
+            >
+              <ngx-datatable-column name="Name" [width]="200" />
+              <ngx-datatable-column name="Gender" [width]="300" />
+              <ngx-datatable-column name="Age" [width]="80" />
+            </ngx-datatable>
+          </div>
         }
       </div>
     </div>
-  `,
-  imports: [DatatableComponent, DataTableColumnDirective]
+  `
 })
 export class TabsDemoComponent {
   rows: FullEmployee[] = [];
@@ -80,8 +80,6 @@ export class TabsDemoComponent {
   tab1 = true;
   tab2 = false;
   tab3 = false;
-
-  ColumnMode = ColumnMode;
 
   private dataService = inject(DataService);
 

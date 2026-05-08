@@ -1,6 +1,8 @@
-import { TableColumn, TableColumnProp } from './table-column.type';
+import { WritableSignal } from '@angular/core';
+
 import { ValueGetter } from '../utils/column-prop-getters';
 import { Row, SortDirection, TreeStatus } from './public.types';
+import { TableColumn, TableColumnProp } from './table-column.type';
 
 export type PinDirection = 'left' | 'center' | 'right';
 
@@ -39,12 +41,6 @@ export interface Page {
   text: string;
 }
 
-export interface DraggableDragEvent {
-  event: MouseEvent | TouchEvent;
-  element: HTMLElement;
-  model: TableColumnInternal;
-}
-
 export interface InnerSortEvent {
   column: SortableTableColumnInternal;
   prevValue: SortDirection | undefined;
@@ -63,7 +59,8 @@ export interface CellActiveEvent<TRow> {
   treeStatus?: TreeStatus;
 }
 
-export interface BaseTableColumnInternal<TRow extends Row = any> extends TableColumn<TRow> {
+export interface BaseTableColumnInternal<TRow extends Row = any>
+  extends Omit<TableColumn<TRow>, 'width'> {
   /** Internal unique id */
   $$id: string;
 
@@ -73,13 +70,17 @@ export interface BaseTableColumnInternal<TRow extends Row = any> extends TableCo
   /** Internal for setColumnDefaults */
   $$valueGetter: ValueGetter;
 
+  /** Reference to the original input column provided by the consumer */
+  $$originalColumn: TableColumn<TRow>;
+
   dragging?: boolean;
   isTarget?: boolean;
   targetMarkerContext?: any;
 
   // Those properties are never null on the internal type:
   name: string;
-  width: number;
+  width: WritableSignal<number>;
+  prop: TableColumnProp;
 }
 
 export interface StandardTableColumnInternal<TRow extends Row = any>

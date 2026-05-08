@@ -1,18 +1,25 @@
+import { NgStyle } from '@angular/common';
 import {
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
-  EventEmitter,
-  HostBinding,
+  computed,
   inject,
-  Input,
-  OnChanges,
-  OnDestroy,
-  Output,
-  SimpleChanges,
+  input,
+  output,
   TemplateRef
 } from '@angular/core';
-import { columnGroupWidths, columnsByPin, columnsByPinArr } from '../../utils/column';
+
+import { DatatableDraggableDirective } from '../../directives/datatable-draggable.directive';
+import { OrderableDirective } from '../../directives/orderable.directive';
+import { ScrollbarHelper } from '../../services/scrollbar-helper.service';
+import {
+  ColumnResizeEventInternal,
+  InnerSortEvent,
+  ReorderEventInternal,
+  SortableTableColumnInternal,
+  TableColumnInternal,
+  TargetChangedEvent
+} from '../../types/internal.types';
 import {
   Row,
   SelectionType,
@@ -21,241 +28,130 @@ import {
   SortPropDir,
   SortType
 } from '../../types/public.types';
-import { NgClass, NgStyle } from '@angular/common';
-import { ScrollbarHelper } from '../../services/scrollbar-helper.service';
-import {
-  ColumnResizeEventInternal,
-  InnerSortEvent,
-  PinnedColumns,
-  ReorderEventInternal,
-  SortableTableColumnInternal,
-  TableColumnInternal,
-  TargetChangedEvent
-} from '../../types/internal.types';
-import { DraggableDirective } from '../../directives/draggable.directive';
-import { LongPressDirective } from '../../directives/long-press.directive';
+import { columnGroupWidths, columnsByPin, columnsByPinArr } from '../../utils/column';
+import { toPublicColumn } from '../../utils/column-helper';
 import { DataTableHeaderCellComponent } from './header-cell.component';
-import { OrderableDirective } from '../../directives/orderable.directive';
 
 @Component({
   selector: 'datatable-header',
+  imports: [OrderableDirective, NgStyle, DataTableHeaderCellComponent, DatatableDraggableDirective],
   template: `
+    @let _columnGroupWidths = this._columnGroupWidths();
     <div
       role="row"
       orderable
+      class="datatable-header-inner"
+      [class.horizontal-overflow]="innerWidth() < _columnGroupWidths.total"
+      [style.width.px]="_columnGroupWidths.total"
       (reorder)="onColumnReordered($event)"
       (targetChanged)="onTargetChanged($event)"
-      [style.width.px]="_columnGroupWidths.total"
-      class="datatable-header-inner"
     >
-      @for (colGroup of _columnsByPin; track colGroup.type) { @if (colGroup.columns.length) {
-      <div
-        class="datatable-row-group"
-        [ngClass]="'datatable-row-' + colGroup.type"
-        [ngStyle]="_styleByGroup[colGroup.type]"
-      >
-        @for (column of colGroup.columns; track column.$$id) {
-        <datatable-header-cell
-          role="columnheader"
-          (resize)="onColumnResized($event)"
-          (resizing)="onColumnResizing($event)"
-          long-press
-          [pressModel]="column"
-          [pressEnabled]="reorderable && column.draggable"
-          (longPressStart)="onLongPressStart($event)"
-          (longPressEnd)="onLongPressEnd($event)"
-          draggable
-          [dragX]="reorderable && column.draggable && column.dragging"
-          [dragY]="false"
-          [dragModel]="column"
-          [dragEventTarget]="dragEventTarget"
-          [headerHeight]="headerHeight"
-          [isTarget]="column.isTarget"
-          [targetMarkerTemplate]="targetMarkerTemplate"
-          [targetMarkerContext]="column.targetMarkerContext"
-          [column]="column"
-          [sortType]="sortType"
-          [sorts]="sorts"
-          [selectionType]="selectionType"
-          [sortAscendingIcon]="sortAscendingIcon"
-          [sortDescendingIcon]="sortDescendingIcon"
-          [sortUnsetIcon]="sortUnsetIcon"
-          [allRowsSelected]="allRowsSelected"
-          [enableClearingSortState]="enableClearingSortState"
-          (sort)="onSort($event)"
-          (select)="select.emit($event)"
-          (columnContextmenu)="columnContextmenu.emit($event)"
-        >
-        </datatable-header-cell>
+      @for (colGroup of _columnsByPin(); track colGroup.type) {
+        @if (colGroup.columns.length) {
+          <div
+            class="datatable-row-group"
+            [class]="'datatable-row-' + colGroup.type"
+            [ngStyle]="_styleByGroup()[colGroup.type]"
+          >
+            @for (column of colGroup.columns; track column.$$id) {
+              <datatable-header-cell
+                role="columnheader"
+                dragStartDelay="500"
+                [datatableDraggable]="reorderable() && column.draggable"
+                [dragModel]="column"
+                [isTarget]="column.isTarget"
+                [targetMarkerTemplate]="targetMarkerTemplate()"
+                [targetMarkerContext]="column.targetMarkerContext"
+                [column]="column"
+                [showResizeHandle]="lastColumnId() !== column.$$id && column.resizeable"
+                [sortType]="sortType()"
+                [sorts]="sorts()"
+                [selectionType]="selectionType()"
+                [sortAscendingIcon]="sortAscendingIcon()"
+                [sortDescendingIcon]="sortDescendingIcon()"
+                [sortUnsetIcon]="sortUnsetIcon()"
+                [allRowsSelected]="allRowsSelected()"
+                [enableClearingSortState]="enableClearingSortState()"
+                [ariaHeaderCheckboxMessage]="ariaHeaderCheckboxMessage()"
+                (resize)="onColumnResized($event)"
+                (resizing)="onColumnResizing($event)"
+                (sort)="onSort($event)"
+                (select)="select.emit($event)"
+                (columnContextmenu)="columnContextmenu.emit($event)"
+              />
+            }
+          </div>
         }
-      </div>
-      } }
+      }
     </div>
   `,
-  host: {
-    class: 'datatable-header'
-  },
   styleUrl: './header.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    OrderableDirective,
-    NgStyle,
-    DataTableHeaderCellComponent,
-    LongPressDirective,
-    DraggableDirective,
-    NgClass
-  ]
+  host: {
+    'class': 'datatable-header',
+    '[style.height.px]': 'headerHeight()',
+    '[style.width]': 'headerWidth()'
+  }
 })
-export class DataTableHeaderComponent implements OnDestroy, OnChanges {
-  private cd = inject(ChangeDetectorRef);
+export class DataTableHeaderComponent {
   private scrollbarHelper = inject(ScrollbarHelper);
 
-  @Input() sortAscendingIcon?: string;
-  @Input() sortDescendingIcon?: string;
-  @Input() sortUnsetIcon?: string;
-  @Input() scrollbarH?: boolean;
-  @Input() dealsWithGroup?: boolean;
-  @Input() targetMarkerTemplate?: TemplateRef<unknown>;
-  @Input() enableClearingSortState = false;
+  readonly lastColumnId = computed(() => this.columns().at(-1)?.$$id);
 
-  @Input() set innerWidth(val: number) {
-    this._innerWidth = val;
-    setTimeout(() => {
-      if (this._columns) {
-        const colByPin = columnsByPin(this._columns);
-        this._columnGroupWidths = columnGroupWidths(colByPin, this._columns);
-        this.setStylesByGroup();
-      }
-    });
-  }
+  readonly sortAscendingIcon = input<string>();
+  readonly sortDescendingIcon = input<string>();
+  readonly sortUnsetIcon = input<string>();
+  readonly scrollbarH = input<boolean>();
+  readonly dealsWithGroup = input<boolean>();
+  readonly targetMarkerTemplate = input<TemplateRef<unknown>>();
+  readonly enableClearingSortState = input(false);
+  readonly innerWidth = input.required<number>();
+  readonly sorts = input.required<SortPropDir[]>();
+  readonly sortType = input.required<SortType>();
+  readonly allRowsSelected = input<boolean>();
+  readonly selectionType = input<SelectionType>();
+  readonly reorderable = input<boolean>();
+  readonly verticalScrollVisible = input(false);
+  readonly ariaHeaderCheckboxMessage = input.required<string>();
 
-  get innerWidth(): number {
-    return this._innerWidth;
-  }
+  readonly headerHeight = input.required<'auto' | number>();
+  readonly columns = input.required<TableColumnInternal[]>();
 
-  @Input() sorts!: SortPropDir[];
-  @Input() sortType!: SortType;
-  @Input() allRowsSelected?: boolean;
-  @Input() selectionType?: SelectionType;
-  @Input() reorderable?: boolean;
-  @Input() verticalScrollVisible = false;
-
-  dragEventTarget?: MouseEvent | TouchEvent;
-
-  @HostBinding('style.height')
-  @Input()
-  set headerHeight(val: any) {
-    if (val !== 'auto') {
-      this._headerHeight = `${val}px`;
-    } else {
-      this._headerHeight = val;
-    }
-  }
-
-  get headerHeight(): any {
-    return this._headerHeight;
-  }
-
-  @Input() set columns(val: TableColumnInternal[]) {
-    this._columns = val;
-
-    const colsByPin = columnsByPin(val);
-    this._columnsByPin = columnsByPinArr(val);
-    setTimeout(() => {
-      this._columnGroupWidths = columnGroupWidths(colsByPin, val);
-      this.setStylesByGroup();
-    });
-  }
-
-  get columns(): any[] {
-    return this._columns;
-  }
-
-  @Input()
-  set offsetX(val: number) {
-    this._offsetX = val;
-    this.setStylesByGroup();
-  }
-  get offsetX() {
-    return this._offsetX;
-  }
-
-  @Output() sort = new EventEmitter<SortEvent>();
-  @Output() reorder = new EventEmitter<ReorderEventInternal>();
-  @Output() resize = new EventEmitter<ColumnResizeEventInternal>();
-  @Output() resizing = new EventEmitter<ColumnResizeEventInternal>();
-  @Output() select = new EventEmitter<void>();
-  @Output() columnContextmenu = new EventEmitter<{
+  readonly sort = output<SortEvent>();
+  readonly reorder = output<ReorderEventInternal>();
+  readonly resize = output<ColumnResizeEventInternal>();
+  readonly resizing = output<ColumnResizeEventInternal>();
+  readonly select = output<void>();
+  readonly columnContextmenu = output<{
     event: MouseEvent;
     column: TableColumnInternal;
-  }>(false);
+  }>();
 
-  _columnsByPin!: PinnedColumns[];
-  _columnGroupWidths: any = {
-    total: 100
-  };
-  _innerWidth!: number;
-  _offsetX!: number;
-  _columns!: TableColumnInternal[];
-  _headerHeight!: string;
-  _styleByGroup: {
-    left: NgStyle['ngStyle'];
-    center: NgStyle['ngStyle'];
-    right: NgStyle['ngStyle'];
-  } = { left: {}, center: {}, right: {} };
+  readonly _columnsByPin = computed(() => {
+    return columnsByPinArr(this.columns());
+  });
+  readonly _columnGroupWidths = computed(() => {
+    const colsByPin = columnsByPin(this.columns());
+    return columnGroupWidths(colsByPin, this.columns());
+  });
+  readonly _styleByGroup = computed(() => {
+    return {
+      left: this.calcStylesByGroup('left'),
+      center: this.calcStylesByGroup('center'),
+      right: this.calcStylesByGroup('right')
+    };
+  });
 
-  private destroyed = false;
-
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes.verticalScrollVisible) {
-      this._styleByGroup.right = this.calcStylesByGroup('right');
-      if (!this.destroyed) {
-        this.cd.detectChanges();
-      }
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed = true;
-  }
-
-  onLongPressStart({
-    event,
-    model
-  }: {
-    event: MouseEvent | TouchEvent;
-    model: TableColumnInternal<Row>;
-  }) {
-    model.dragging = true;
-    this.dragEventTarget = event;
-  }
-
-  onLongPressEnd({ model }: { model: TableColumnInternal<Row> }) {
-    this.dragEventTarget = undefined;
-
-    // delay resetting so sort can be
-    // prevented if we were dragging
-    setTimeout(() => {
-      // datatable component creates copies from columns on reorder
-      // set dragging to false on new objects
-      const column = this._columns.find(c => c.$$id === model.$$id);
-      if (column && 'dragging' in column) {
-        column.dragging = false;
-      }
-    }, 5);
-  }
-
-  @HostBinding('style.width')
-  get headerWidth(): string {
-    if (this.scrollbarH) {
-      const width = this.verticalScrollVisible
-        ? this.innerWidth - this.scrollbarHelper.width
-        : this.innerWidth;
+  readonly headerWidth = computed(() => {
+    if (this.scrollbarH()) {
+      const width = this.verticalScrollVisible()
+        ? this.innerWidth() - this.scrollbarHelper.width
+        : this.innerWidth();
       return width + 'px';
     }
 
     return '100%';
-  }
+  });
 
   onColumnResized({ width, column }: { width: number; column: TableColumnInternal }): void {
     this.resize.emit(this.makeResizeEvent(width, column));
@@ -276,7 +172,7 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
     }
     return {
       column,
-      prevValue: column.width,
+      prevValue: column.width(),
       newValue: width
     };
   }
@@ -307,17 +203,18 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
   }
 
   getColumn(index: number): any {
-    const leftColumnCount = this._columnsByPin[0].columns.length;
+    const _columnsByPin = this._columnsByPin();
+    const leftColumnCount = _columnsByPin[0].columns.length;
     if (index < leftColumnCount) {
-      return this._columnsByPin[0].columns[index];
+      return _columnsByPin[0].columns[index];
     }
 
-    const centerColumnCount = this._columnsByPin[1].columns.length;
+    const centerColumnCount = _columnsByPin[1].columns.length;
     if (index < leftColumnCount + centerColumnCount) {
-      return this._columnsByPin[1].columns[index - leftColumnCount];
+      return _columnsByPin[1].columns[index - leftColumnCount];
     }
 
-    return this._columnsByPin[2].columns[index - leftColumnCount - centerColumnCount];
+    return _columnsByPin[2].columns[index - leftColumnCount - centerColumnCount];
   }
 
   onSort({ column, prevValue, newValue }: InnerSortEvent): void {
@@ -329,7 +226,7 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
     const sorts = this.calcNewSorts(column, prevValue, newValue);
     this.sort.emit({
       sorts,
-      column,
+      column: toPublicColumn(column),
       prevValue,
       newValue
     });
@@ -342,11 +239,7 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
   ): SortPropDir[] {
     let idx = 0;
 
-    if (!this.sorts) {
-      this.sorts = [];
-    }
-
-    const sorts = this.sorts.map((s, i) => {
+    const sorts = this.sorts().map((s, i) => {
       s = { ...s };
       if (s.prop === column.prop) {
         idx = i;
@@ -359,8 +252,8 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
     } else if (prevValue) {
       sorts[idx].dir = newValue;
     } else {
-      if (this.sortType === SortType.single) {
-        sorts.splice(0, this.sorts.length);
+      if (this.sortType() === 'single') {
+        sorts.splice(0, this.sorts().length);
       }
 
       sorts.push({ dir: newValue, prop: column.prop });
@@ -369,25 +262,8 @@ export class DataTableHeaderComponent implements OnDestroy, OnChanges {
     return sorts;
   }
 
-  setStylesByGroup() {
-    this._styleByGroup.left = this.calcStylesByGroup('left');
-    this._styleByGroup.center = this.calcStylesByGroup('center');
-    this._styleByGroup.right = this.calcStylesByGroup('right');
-    if (!this.destroyed) {
-      this.cd.detectChanges();
-    }
-  }
-
   calcStylesByGroup(group: 'center' | 'right' | 'left'): NgStyle['ngStyle'] {
-    const widths = this._columnGroupWidths;
-
-    if (group === 'center') {
-      return {
-        transform: `translateX(${this.offsetX * -1}px)`,
-        width: `${widths[group]}px`,
-        willChange: 'transform'
-      };
-    }
+    const widths = this._columnGroupWidths();
 
     return {
       width: `${widths[group]}px`

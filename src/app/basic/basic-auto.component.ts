@@ -1,14 +1,12 @@
-import { Component, inject } from '@angular/core';
-import {
-  ColumnMode,
-  DatatableComponent,
-  TableColumn
-} from 'projects/swimlane/ngx-datatable/src/public-api';
+import { Component, inject, signal } from '@angular/core';
+import { DatatableComponent, TableColumn } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { Employee } from '../data.model';
 import { DataService } from '../data.service';
 
 @Component({
   selector: 'basic-auto-demo',
+  imports: [DatatableComponent],
   template: `
     <div>
       <h3>
@@ -24,23 +22,22 @@ import { DataService } from '../data.service';
       </h3>
       <ngx-datatable
         class="material"
-        [rows]="rows"
-        [loadingIndicator]="loadingIndicator"
+        rowHeight="auto"
+        columnMode="force"
+        [rowDraggable]="true"
+        [rows]="rows()"
+        [loadingIndicator]="loadingIndicator()"
         [columns]="columns"
-        [columnMode]="ColumnMode.force"
         [headerHeight]="50"
         [footerHeight]="50"
-        rowHeight="auto"
         [reorderable]="reorderable"
-      >
-      </ngx-datatable>
+      />
     </div>
-  `,
-  imports: [DatatableComponent]
+  `
 })
 export class BasicAutoComponent {
-  rows: Employee[] = [];
-  loadingIndicator = true;
+  readonly rows = signal<Employee[]>([]);
+  readonly loadingIndicator = signal(true);
   reorderable = true;
 
   columns: TableColumn[] = [
@@ -49,16 +46,12 @@ export class BasicAutoComponent {
     { name: 'Company', sortable: false }
   ];
 
-  ColumnMode = ColumnMode;
-
   private dataService = inject(DataService);
 
   constructor() {
     this.dataService.load('company.json').subscribe(data => {
-      this.rows = data;
-      setTimeout(() => {
-        this.loadingIndicator = false;
-      }, 1500);
+      this.rows.set(data);
+      setTimeout(() => this.loadingIndicator.set(false), 1500);
     });
   }
 }

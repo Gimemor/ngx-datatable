@@ -1,14 +1,15 @@
 import { Component } from '@angular/core';
 import {
-  ColumnMode,
   DataTableColumnDirective,
   DatatableComponent,
   TableColumn
 } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { Employee } from '../data.model';
 
 @Component({
   selector: 'column-toggle-demo',
+  imports: [DatatableComponent, DataTableColumnDirective],
   template: `
     <div>
       <h3>
@@ -25,14 +26,14 @@ import { Employee } from '../data.model';
       <div style="float:left;width:75%">
         <ngx-datatable
           class="material"
+          rowHeight="auto"
+          columnMode="force"
           [rows]="rows"
-          [columnMode]="ColumnMode.force"
           [headerHeight]="50"
           [footerHeight]="50"
-          rowHeight="auto"
         >
           @for (col of columns; track col) {
-          <ngx-datatable-column [name]="col.name"> </ngx-datatable-column>
+            <ngx-datatable-column [name]="col.name" />
           }
         </ngx-datatable>
       </div>
@@ -40,21 +41,20 @@ import { Employee } from '../data.model';
         <h4>Available Columns</h4>
         <ul>
           @for (col of allColumns; track col) {
-          <li>
-            <input
-              type="checkbox"
-              [id]="col.name"
-              (click)="toggle(col)"
-              [checked]="isChecked(col)"
-            />
-            <label [attr.for]="col.name">{{ col.name }}</label>
-          </li>
+            <li>
+              <input
+                type="checkbox"
+                [id]="col.name"
+                [checked]="isChecked(col)"
+                (click)="toggle(col)"
+              />
+              <label [attr.for]="col.name">{{ col.name }}</label>
+            </li>
           }
         </ul>
       </div>
     </div>
-  `,
-  imports: [DatatableComponent, DataTableColumnDirective]
+  `
 })
 export class ColumnToggleComponent {
   rows: Employee[] = [
@@ -74,15 +74,11 @@ export class ColumnToggleComponent {
 
   allColumns: TableColumn[] = [{ name: 'Name' }, { name: 'Gender' }, { name: 'Company' }];
 
-  ColumnMode = ColumnMode;
-
   toggle(col: TableColumn) {
     const isChecked = this.isChecked(col);
 
     if (isChecked) {
-      this.columns = this.columns.filter(c => {
-        return c.name !== col.name;
-      });
+      this.columns = this.columns.filter(c => c.name !== col.name);
     } else {
       this.columns = [...this.columns, col];
     }

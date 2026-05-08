@@ -1,24 +1,37 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
-  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
-  Input,
+  computed,
+  input,
   numberAttribute
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+
 import { TableColumnInternal } from '../../../types/internal.types';
 
 @Component({
-  selector: `ghost-loader`,
-  templateUrl: `./ghost-loader.component.html`,
-  styleUrls: [`./ghost-loader.component.scss`],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet]
+  selector: 'ghost-loader',
+  imports: [NgTemplateOutlet],
+  templateUrl: './ghost-loader.component.html',
+  styleUrl: './ghost-loader.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DataTableGhostLoaderComponent {
-  @Input() columns!: TableColumnInternal[];
-  @Input({ transform: numberAttribute }) pageSize!: number;
-  @Input() rowHeight!: number | 'auto' | ((row?: any) => number);
-  @Input({ transform: numberAttribute }) ghostBodyHeight?: number;
-  @Input({ transform: booleanAttribute }) cellMode = false;
+  readonly columns = input.required<TableColumnInternal[]>();
+  readonly pageSize = input.required<number, unknown>({ transform: numberAttribute });
+  readonly rowHeight = input.required<number | 'auto' | ((row?: any) => number)>();
+  readonly ghostBodyHeight = input<number, unknown>(undefined, { transform: numberAttribute });
+
+  protected readonly ghostRows = computed(() =>
+    Array.from({ length: this.pageSize() }, (_, index) => index)
+  );
+
+  protected readonly rowHeightComputed = () => {
+    const rowHeight = this.rowHeight();
+    if (typeof rowHeight === 'function') {
+      // If rowHeight is a function, we cannot determine a fixed height here.
+      return 'auto';
+    }
+    return rowHeight === 'auto' ? 'auto' : rowHeight + 'px';
+  };
 }

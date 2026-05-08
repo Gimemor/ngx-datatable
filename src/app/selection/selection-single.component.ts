@@ -1,17 +1,16 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
   ActivateEvent,
-  ColumnMode,
   DatatableComponent,
-  SelectEvent,
-  SelectionType,
   TableColumn
 } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { Employee } from '../data.model';
 import { DataService } from '../data.service';
 
 @Component({
   selector: 'single-selection-demo',
+  imports: [DatatableComponent],
   template: `
     <div>
       <h3>
@@ -33,63 +32,61 @@ import { DataService } from '../data.service';
           >
         </div>
 
+        @let rows = this.rows();
         <ngx-datatable
-          class="material"
+          class="material selection-row"
+          rowHeight="auto"
+          columnMode="force"
+          selectionType="single"
           [rows]="rows"
-          [columnMode]="ColumnMode.force"
           [columns]="columns"
           [headerHeight]="50"
           [footerHeight]="50"
-          rowHeight="auto"
           [limit]="5"
-          [selected]="selected"
-          [selectionType]="SelectionType.single"
+          [(selected)]="selected"
           (activate)="onActivate($event)"
-          (select)="onSelect($event)"
-        >
-        </ngx-datatable>
+          (selectedChange)="onSelect($event)"
+        />
       </div>
 
       <div class="selected-column">
         <h4>Selections</h4>
         <ul>
           @for (sel of selected; track sel) {
-          <li>
-            {{ sel.name }}
-          </li>
-          } @if (!selected.length) {
-          <li>No Selections</li>
+            <li>
+              {{ sel.name }}
+            </li>
+          } @empty {
+            <li>No Selections</li>
           }
         </ul>
       </div>
     </div>
-  `,
-  imports: [DatatableComponent]
+  `
 })
 export class SingleSelectionComponent {
-  rows: Employee[] = [];
+  readonly rows = signal<Employee[]>([]);
 
   selected: Employee[] = [];
 
   columns: TableColumn[] = [{ prop: 'name' }, { name: 'Company' }, { name: 'Gender' }];
-
-  ColumnMode = ColumnMode;
-  SelectionType = SelectionType;
 
   private dataService = inject(DataService);
 
   constructor() {
     this.dataService.load('company.json').subscribe(data => {
       this.selected = [data[2]];
-      this.rows = data;
+      this.rows.set(data);
     });
   }
 
-  onSelect({ selected }: SelectEvent<Employee>) {
-    console.log('Select Event', selected, this.selected);
+  onSelect(employees: Employee[]) {
+    // eslint-disable-next-line no-console
+    console.log('Select Event', employees);
   }
 
   onActivate(event: ActivateEvent<Employee>) {
+    // eslint-disable-next-line no-console
     console.log('Activate Event', event);
   }
 }

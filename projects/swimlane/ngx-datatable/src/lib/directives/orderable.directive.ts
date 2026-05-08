@@ -3,24 +3,25 @@ import {
   ContentChildren,
   Directive,
   DOCUMENT,
-  EventEmitter,
+  effect,
   inject,
   KeyValueChangeRecord,
   KeyValueDiffer,
   KeyValueDiffers,
   OnDestroy,
-  Output,
-  QueryList
+  output,
+  OutputRefSubscription,
+  QueryList,
+  signal
 } from '@angular/core';
-import { DraggableDirective } from './draggable.directive';
+import { startWith } from 'rxjs';
 
 import {
-  DraggableDragEvent,
   ReorderEventInternal,
   TableColumnInternal,
   TargetChangedEvent
 } from '../types/internal.types';
-import { getPositionFromEvent } from '../utils/events';
+import { DatatableDraggableDirective, DragEvent } from './datatable-draggable.directive';
 
 interface OrderPosition {
   left: number;
@@ -35,87 +36,129 @@ interface OrderPosition {
 export class OrderableDirective implements AfterContentInit, OnDestroy {
   private document = inject(DOCUMENT);
 
-  @Output() reorder = new EventEmitter<ReorderEventInternal>();
-  @Output() targetChanged = new EventEmitter<TargetChangedEvent>();
+  readonly reorder = output<ReorderEventInternal>();
+  readonly targetChanged = output<TargetChangedEvent>();
 
-  @ContentChildren(DraggableDirective, { descendants: true })
-  draggables!: QueryList<DraggableDirective>;
+  // This should be contentChildren() query, but there is an open Angular issue with signal queries (https://github.com/angular/angular/issues/59067)
+  // This problem causes the orderable directive to fail because the contentChildren query is resolved too early.
+  // At that state, the input is not yet set, resulting in a NG0950 error.
+  @ContentChildren(DatatableDraggableDirective, { descendants: true })
+  draggablesQueryList!: QueryList<DatatableDraggableDirective>;
+
+  readonly draggables = signal<DatatableDraggableDirective[]>([]);
+
+  readonly subscriptions = new Map<string, OutputRefSubscription[]>();
 
   positions?: Record<string, OrderPosition>;
-  differ: KeyValueDiffer<string, DraggableDirective> = inject(KeyValueDiffers).find({}).create();
+  readonly differ: KeyValueDiffer<string, DatatableDraggableDirective> = inject(KeyValueDiffers)
+    .find({})
+    .create();
   lastDraggingIndex?: number;
 
-  ngAfterContentInit(): void {
-    // HACK: Investigate Better Way
-    this.updateSubscriptions();
-    this.draggables.changes.subscribe(this.updateSubscriptions.bind(this));
-  }
+  constructor() {
+    effect(() => {
+      const diffMap = this.draggables().reduce(
+        (acc, curr) => {
+          acc[curr.dragModel()!.$$id] = curr;
+          return acc;
+        },
+        {} as Record<string, DatatableDraggableDirective>
+      );
 
-  ngOnDestroy(): void {
-    this.draggables.forEach(d => {
-      d.dragStart.unsubscribe();
-      d.dragging.unsubscribe();
-      d.dragEnd.unsubscribe();
+      this.updateSubscriptions(diffMap);
     });
   }
 
-  updateSubscriptions(): void {
-    const diffs = this.differ.diff(this.createMapDiffs());
-
-    if (diffs) {
-      const subscribe = (record: KeyValueChangeRecord<string, DraggableDirective>) => {
-        unsubscribe(record);
-        const { currentValue } = record;
-
-        if (currentValue) {
-          currentValue.dragStart.subscribe(this.onDragStart.bind(this));
-          currentValue.dragging.subscribe(this.onDragging.bind(this));
-          currentValue.dragEnd.subscribe(this.onDragEnd.bind(this));
-        }
-      };
-
-      const unsubscribe = ({ previousValue }: KeyValueChangeRecord<string, DraggableDirective>) => {
-        if (previousValue) {
-          previousValue.dragStart.unsubscribe();
-          previousValue.dragging.unsubscribe();
-          previousValue.dragEnd.unsubscribe();
-        }
-      };
-
-      diffs.forEachAddedItem(subscribe);
-      // diffs.forEachChangedItem(subscribe.bind(this));
-      diffs.forEachRemovedItem(unsubscribe);
-    }
+  ngAfterContentInit(): void {
+    this.draggablesQueryList.changes.pipe(startWith(this.draggablesQueryList)).subscribe(() => {
+      this.draggables.set(this.draggablesQueryList.toArray());
+    });
   }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach(subList => subList.forEach(sub => sub.unsubscribe()));
+  }
+
+  updateSubscriptions(diffMap: Record<string, DatatableDraggableDirective>): void {
+    const differResult = this.differ.diff(diffMap);
+    if (!differResult) {
+      return;
+    }
+    differResult.forEachAddedItem(record => this.subscribeToDraggable(record));
+    differResult.forEachRemovedItem(record => this.unsubscribeFromDraggable(record));
+  }
+
+  private subscribeToDraggable = (
+    record: KeyValueChangeRecord<string, DatatableDraggableDirective>
+  ): void => {
+    this.unsubscribeFromDraggable(record);
+    const { key, currentValue } = record;
+    if (!currentValue) {
+      return;
+    }
+    const subs = this.subscriptions.get(key) ?? [];
+    let currentEvent: DragEvent;
+    subs.push(
+      currentValue.dragStart.subscribe(() => this.onDragStart()),
+      currentValue.dragMove.subscribe(e => {
+        currentEvent = e;
+        this.onDragging(e, currentValue.dragModel()!, currentValue.element);
+      }),
+      currentValue.dragEnd.subscribe(() =>
+        this.onDragEnd(currentEvent!, currentValue.dragModel()!, currentValue.element)
+      )
+    );
+    this.subscriptions.set(key, subs);
+  };
+
+  private unsubscribeFromDraggable = (
+    record: KeyValueChangeRecord<string, DatatableDraggableDirective>
+  ): void => {
+    const { key, previousValue } = record;
+    if (!previousValue) {
+      return;
+    }
+    const subs = this.subscriptions.get(key);
+    if (!subs) {
+      return;
+    }
+    subs.forEach(sub => sub.unsubscribe());
+    this.subscriptions.delete(key);
+  };
 
   onDragStart(): void {
-    this.positions = {};
-
-    let i = 0;
-    for (const dragger of this.draggables.toArray()) {
-      const elm = dragger.element;
-      const left = parseInt(elm.offsetLeft.toString(), 0);
-      this.positions[dragger.dragModel.$$id] = {
+    const positions: Record<string, OrderPosition> = {};
+    this.draggables().forEach((draggable, idx) => {
+      const elm = draggable.element;
+      const left = parseInt(elm.offsetLeft.toString(), 10);
+      positions[draggable.dragModel()!.$$id] = {
         left,
-        right: left + parseInt(elm.offsetWidth.toString(), 0),
-        index: i++,
+        right: left + parseInt(elm.offsetWidth.toString(), 10),
+        index: idx,
         element: elm
       };
-    }
+    });
+    this.positions = positions;
   }
 
-  onDragging({ element, model, event }: DraggableDragEvent): void {
-    const prevPos = this.positions![model.$$id];
-    const target = this.isTarget(model, event);
-
+  onDragging(
+    { currentX, currentY, initialX }: DragEvent,
+    model: TableColumnInternal,
+    element: HTMLElement
+  ): void {
+    if (!this.positions) {
+      return;
+    }
+    const prevPos = this.positions[model.$$id];
+    const target = this.isTarget(model, currentX, currentY);
     if (target) {
-      if (this.lastDraggingIndex !== target.i) {
+      if (this.lastDraggingIndex !== target.index) {
         this.targetChanged.emit({
           prevIndex: this.lastDraggingIndex!,
-          newIndex: target.i,
+          newIndex: target.index,
           initialIndex: prevPos.index
         });
-        this.lastDraggingIndex = target.i;
+        this.lastDraggingIndex = target.index;
       }
     } else if (this.lastDraggingIndex !== prevPos.index) {
       this.targetChanged.emit({
@@ -124,49 +167,49 @@ export class OrderableDirective implements AfterContentInit, OnDestroy {
       });
       this.lastDraggingIndex = prevPos.index;
     }
+
+    requestAnimationFrame(() => (element.style.left = `${currentX - initialX}px`));
   }
 
-  onDragEnd({ element, model, event }: DraggableDragEvent): void {
-    const prevPos = this.positions![model.$$id];
-
-    const target = this.isTarget(model, event);
+  onDragEnd(
+    { currentX, currentY }: DragEvent,
+    model: TableColumnInternal,
+    element: HTMLElement
+  ): void {
+    if (!this.positions) {
+      return;
+    }
+    const prevPos = this.positions[model.$$id];
+    const target = this.isTarget(model, currentX, currentY);
     if (target) {
       this.reorder.emit({
         prevValue: prevPos.index,
-        newValue: target.i,
+        newValue: target.index,
         column: model
       });
     }
-
     this.lastDraggingIndex = undefined;
     element.style.left = 'auto';
   }
 
-  isTarget(model: TableColumnInternal, event: MouseEvent | TouchEvent) {
-    let i = 0;
-    const { clientX, clientY } = getPositionFromEvent(event);
-    const targets = this.document.elementsFromPoint(clientX, clientY);
-
-    for (const id in this.positions) {
-      // current column position which throws event.
-      const pos = this.positions[id];
-
-      // since we drag the inner span, we need to find it in the elements at the cursor
-      if (model.$$id !== id && targets.find((el: any) => el === pos.element)) {
-        return {
-          pos,
-          i
-        };
-      }
-
-      i++;
+  isTarget(
+    model: TableColumnInternal,
+    clientX: number,
+    clientY: number
+  ): { pos: OrderPosition; index: number } | undefined {
+    if (!this.positions) {
+      return undefined;
     }
-  }
-
-  private createMapDiffs(): Record<string, DraggableDirective> {
-    return this.draggables.toArray().reduce((acc, curr) => {
-      acc[curr.dragModel.$$id] = curr;
-      return acc;
-    }, {} as Record<string, DraggableDirective>);
+    const elementsAtPoint = this.document.elementsFromPoint(clientX, clientY);
+    return Object.entries(this.positions).reduce<{ pos: OrderPosition; index: number } | undefined>(
+      (acc, [id, pos], idx) => {
+        // since we drag the inner span, we need to find it in the elements at the cursor
+        if (!acc && model.$$id !== id && elementsAtPoint.some(el => el === pos.element)) {
+          return { pos, index: idx };
+        }
+        return acc;
+      },
+      undefined
+    );
   }
 }

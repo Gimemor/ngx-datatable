@@ -1,14 +1,12 @@
-import { Component, inject } from '@angular/core';
-import {
-  ColumnMode,
-  DatatableComponent,
-  TableColumn
-} from 'projects/swimlane/ngx-datatable/src/public-api';
+import { Component, inject, signal } from '@angular/core';
+import { DatatableComponent, TableColumn } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { Employee } from '../data.model';
 import { DataService } from '../data.service';
 
 @Component({
-  selector: 'basic-dark-theme-demo',
+  selector: 'dark-theme-demo',
+  imports: [DatatableComponent],
   template: `
     <div>
       <h3>
@@ -22,27 +20,27 @@ import { DataService } from '../data.service';
           </a>
         </small>
       </h3>
+      @let rows = this.rows();
+      @let loadingIndicator = this.loadingIndicator();
       <ngx-datatable
         class="dark"
+        rowHeight="auto"
+        columnMode="force"
         [rows]="rows"
         [loadingIndicator]="loadingIndicator"
         [columns]="columns"
-        [columnMode]="ColumnMode.force"
         [headerHeight]="40"
         [summaryRow]="true"
         [footerHeight]="40"
         [limit]="10"
-        rowHeight="auto"
         [reorderable]="reorderable"
-      >
-      </ngx-datatable>
+      />
     </div>
-  `,
-  imports: [DatatableComponent]
+  `
 })
 export class DarkThemeComponent {
-  rows: Employee[] = [];
-  loadingIndicator = true;
+  readonly rows = signal<Employee[]>([]);
+  readonly loadingIndicator = signal(true);
   reorderable = true;
 
   columns: TableColumn[] = [
@@ -51,16 +49,12 @@ export class DarkThemeComponent {
     { name: 'Company', summaryFunc: () => null }
   ];
 
-  ColumnMode = ColumnMode;
-
   private dataService = inject(DataService);
 
   constructor() {
     this.dataService.load('company.json').subscribe(data => {
-      this.rows = data;
-      setTimeout(() => {
-        this.loadingIndicator = false;
-      }, 1500);
+      this.rows.set(data);
+      setTimeout(() => this.loadingIndicator.set(false), 1500);
     });
   }
 

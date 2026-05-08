@@ -1,38 +1,42 @@
-import { adjustColumnWidths, forceFillColumnWidths } from './math';
-import { toInternalColumn } from './column-helper';
+import { signal } from '@angular/core';
+
 import { TableColumnInternal } from '../types/internal.types';
+import { toInternalColumn } from './column-helper';
+import { emptyStringGetter } from './column-prop-getters';
+import { adjustColumnWidths, forceFillColumnWidths } from './math';
+import { orderByComparator } from './sort';
 
 describe('Math function', () => {
   describe('forceFillColumnWidths', () => {
     describe('when column expanded', () => {
       it('should resize only columns right to the resized column', () => {
-        const columns = [
+        const columns = toInternalColumn([
           { prop: 'id', width: 250, canAutoResize: true },
           { prop: 'name', width: 400, canAutoResize: true },
           { prop: 'email', width: 250, canAutoResize: true }
-        ];
+        ]);
 
-        forceFillColumnWidths(columns as TableColumnInternal[], 750, 1, true); // Column 2 expanded from 250 to 400
+        forceFillColumnWidths(columns as any, 750, 1, true); // Column 2 expanded from 250 to 400
 
-        expect(columns[0].width).toBe(250); // Not changed
-        expect(columns[1].width).toBe(400);
-        expect(columns[2].width).toBe(250);
+        expect(columns[0].width()).toBe(250); // Not changed
+        expect(columns[1].width()).toBe(400);
+        expect(columns[2].width()).toBe(250);
       });
     });
 
     describe('when column compressed', () => {
       it('should resize only columns right to the resized column', () => {
-        const columns = [
+        const columns = toInternalColumn([
           { prop: 'id', width: 250, canAutoResize: true },
           { prop: 'name', width: 180, canAutoResize: true },
           { prop: 'email', width: 250, canAutoResize: true }
-        ];
+        ]);
 
-        forceFillColumnWidths(columns as TableColumnInternal[], 750, 1, true); // Column 2 contracted from 250 to 180
+        forceFillColumnWidths(columns as any, 750, 1, true); // Column 2 contracted from 250 to 180
 
-        expect(columns[0].width).toBe(250); // Not changed
-        expect(columns[1].width).toBe(180);
-        expect(columns[2].width).toBe(320);
+        expect(columns[0].width()).toBe(250); // Not changed
+        expect(columns[1].width()).toBe(180);
+        expect(columns[2].width()).toBe(320);
       });
     });
   });
@@ -44,7 +48,6 @@ describe('Math function', () => {
           {
             prop: 'id1',
             width: 287,
-            maxWidth: undefined,
             minWidth: 175,
             flexGrow: 2,
             canAutoResize: true
@@ -52,7 +55,6 @@ describe('Math function', () => {
           {
             prop: 'id2',
             width: 215,
-            maxWidth: undefined,
             minWidth: 200,
             flexGrow: 1.5,
             canAutoResize: true
@@ -60,7 +62,6 @@ describe('Math function', () => {
           {
             prop: 'id3',
             width: 287,
-            maxWidth: undefined,
             minWidth: 150,
             flexGrow: 2,
             canAutoResize: true
@@ -68,7 +69,6 @@ describe('Math function', () => {
           {
             prop: 'id4',
             width: 175,
-            maxWidth: undefined,
             minWidth: 175,
             flexGrow: 1,
             canAutoResize: true
@@ -76,7 +76,6 @@ describe('Math function', () => {
           {
             prop: 'id5',
             width: 143,
-            maxWidth: undefined,
             minWidth: 120,
             flexGrow: 1,
             canAutoResize: true
@@ -87,7 +86,7 @@ describe('Math function', () => {
 
         adjustColumnWidths(cols, givenTableWidth);
 
-        const totalAdjustedColumnWidths = cols.map(c => c.width).reduce((p, c) => p + c, 0);
+        const totalAdjustedColumnWidths = cols.map(c => c.width()).reduce((p, c) => p + c, 0);
         expect(totalAdjustedColumnWidths).toBeCloseTo(givenTableWidth, 0.001);
       });
 
@@ -96,7 +95,6 @@ describe('Math function', () => {
           {
             prop: 'id1',
             width: 100,
-            maxWidth: undefined,
             minWidth: 100,
             flexGrow: 1,
             canAutoResize: true
@@ -104,7 +102,6 @@ describe('Math function', () => {
           {
             prop: 'id2',
             width: 100,
-            maxWidth: undefined,
             minWidth: 100,
             flexGrow: 1,
             canAutoResize: true
@@ -114,7 +111,7 @@ describe('Math function', () => {
 
         adjustColumnWidths(cols, maxWidth);
 
-        const totalAdjustedColumnWidths = cols.map(c => c.width).reduce((p, c) => p + c, 0);
+        const totalAdjustedColumnWidths = cols.map(c => c.width()).reduce((p, c) => p + c, 0);
         expect(totalAdjustedColumnWidths).toBeGreaterThan(maxWidth);
       });
 
@@ -123,7 +120,6 @@ describe('Math function', () => {
           {
             prop: 'id1',
             width: 0,
-            maxWidth: undefined,
             minWidth: 10,
             flexGrow: 3.0000000000000075,
             canAutoResize: true
@@ -131,7 +127,6 @@ describe('Math function', () => {
           {
             prop: 'id2',
             width: 0,
-            maxWidth: undefined,
             minWidth: 10,
             flexGrow: 1,
             canAutoResize: true
@@ -141,8 +136,52 @@ describe('Math function', () => {
         adjustColumnWidths(cols, 40);
 
         for (const col of cols) {
-          expect(col.width - col.minWidth!).toBeGreaterThanOrEqual(0);
+          expect(col.width() - col.minWidth!).toBeGreaterThanOrEqual(0);
         }
+      });
+
+      it('should scale columns after resizing', () => {
+        const cols: TableColumnInternal[] = [
+          {
+            $$id: 'id1',
+            $$valueGetter: emptyStringGetter,
+            $$originalColumn: {},
+            comparator: orderByComparator,
+            prop: 'id1',
+            sortable: false,
+            name: 'Column 1',
+            canAutoResize: true,
+            width: signal(100),
+            flexGrow: 1
+          },
+          {
+            $$id: 'id2',
+            $$valueGetter: emptyStringGetter,
+            $$originalColumn: {},
+            $$oldWidth: 100,
+            comparator: orderByComparator,
+            prop: 'id2',
+            sortable: false,
+            name: 'Column 2',
+            canAutoResize: true,
+            width: signal(200)
+          },
+          {
+            $$id: 'id3',
+            $$valueGetter: emptyStringGetter,
+            $$originalColumn: {},
+            comparator: orderByComparator,
+            prop: 'id3',
+            sortable: false,
+            name: 'Column 3',
+            canAutoResize: true,
+            width: signal(100),
+            flexGrow: 2
+          }
+        ];
+
+        adjustColumnWidths(cols, 500);
+        expect(cols.map(c => c.width())).toEqual([100, 200, 200]);
       });
     });
   });

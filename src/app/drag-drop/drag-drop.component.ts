@@ -1,20 +1,27 @@
 import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
-  ColumnMode,
   DatatableComponent,
   DatatableRowDefComponent,
   DatatableRowDefDirective
 } from 'projects/swimlane/ngx-datatable/src/public-api';
-import { DataService } from '../data.service';
+
 import { Employee } from '../data.model';
+import { DataService } from '../data.service';
 
 @Component({
   selector: 'drag-drop-demo',
+  imports: [
+    DatatableComponent,
+    CdkDropList,
+    DatatableRowDefDirective,
+    DatatableRowDefComponent,
+    CdkDrag
+  ],
   template: `
     <div>
       <h3>
-        Drag Drop Using Angular CDK
+        Drag Drop
         <small>
           <a
             href="https://github.com/swimlane/ngx-datatable/blob/master/src/app/drag-drop/drag-drop.component.ts"
@@ -26,34 +33,27 @@ import { Employee } from '../data.model';
       </h3>
       <ngx-datatable
         class="material"
-        [rows]="rows"
-        [loadingIndicator]="loadingIndicator"
+        rowHeight="auto"
+        cdkDropList
+        columnMode="force"
+        [rows]="rows()"
+        [loadingIndicator]="loadingIndicator()"
         [columns]="columns"
-        [columnMode]="ColumnMode.force"
         [headerHeight]="50"
         [footerHeight]="50"
-        rowHeight="auto"
         [reorderable]="reorderable"
         (cdkDropListDropped)="drop($event)"
-        cdkDropList
       >
         <ng-template rowDef>
-          <datatable-row-def cdkDrag [cdkDragPreviewContainer]="'parent'" />
+          <datatable-row-def cdkDrag cdkDragPreviewContainer="parent" />
         </ng-template>
       </ngx-datatable>
     </div>
-  `,
-  imports: [
-    DatatableComponent,
-    CdkDropList,
-    DatatableRowDefDirective,
-    DatatableRowDefComponent,
-    CdkDrag
-  ]
+  `
 })
 export class DragDropComponent {
-  rows: Employee[] = [];
-  loadingIndicator = true;
+  readonly rows = signal<Employee[]>([]);
+  readonly loadingIndicator = signal<boolean>(true);
   reorderable = true;
 
   columns = [
@@ -62,21 +62,22 @@ export class DragDropComponent {
     { name: 'Company', sortable: false }
   ];
 
-  ColumnMode = ColumnMode;
-
   private dataService = inject(DataService);
 
   constructor() {
     this.dataService.load('company.json').subscribe(data => {
-      this.rows = data;
+      this.rows.set(data);
       setTimeout(() => {
-        this.loadingIndicator = false;
+        this.loadingIndicator.set(false);
       }, 1500);
     });
   }
 
   drop(event: CdkDragDrop<any>) {
-    moveItemInArray(this.rows, event.previousIndex, event.currentIndex);
-    this.rows = [...this.rows];
+    this.rows.update(currentRows => {
+      const updatedRows = [...currentRows];
+      moveItemInArray(updatedRows, event.previousIndex, event.currentIndex);
+      return updatedRows;
+    });
   }
 }

@@ -7,11 +7,9 @@
     "declaration": false,
     "experimentalDecorators": true,
     "module": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "importHelpers": true,
     "target": "es2022",
-    "typeRoots": ["node_modules/@types"],
-    "lib": ["es2022", "dom"],
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noUnusedLocals": true,
@@ -20,12 +18,14 @@
       "@swimlane/ngx-datatable/*": ["dist/swimlane/ngx-datatable/*"]
     },
     "useDefineForClassFields": false,
-    "strictFunctionTypes": true
+    "strictFunctionTypes": true,
+    "types": ["vitest/globals", "node"]
   },
   "angularCompilerOptions": {
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
     "strictTemplates": true,
     "enableIvy": true
-  }
+  },
+  "exclude": ["testing/**/*.ts"]
 }

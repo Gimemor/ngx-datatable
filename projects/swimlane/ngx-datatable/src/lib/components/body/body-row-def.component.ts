@@ -1,15 +1,16 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   Directive,
   inject,
   InjectionToken,
   Injector,
-  Input,
+  input,
   OnInit,
   TemplateRef,
   ViewContainerRef
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+
 import { RowOrGroup } from '../../types/public.types';
 
 /**
@@ -19,19 +20,19 @@ import { RowOrGroup } from '../../types/public.types';
  */
 @Component({
   selector: 'datatable-row-def',
-  template: `@if (rowDef.rowDefInternal.rowTemplate) {
+  imports: [NgTemplateOutlet],
+  template: `@if (rowDef.rowDefInternal().rowTemplate) {
     <ng-container
-      [ngTemplateOutlet]="rowDef.rowDefInternal.rowTemplate"
+      [ngTemplateOutlet]="rowDef.rowDefInternal().rowTemplate"
       [ngTemplateOutletContext]="rowContext"
     />
-  }`,
-  imports: [NgTemplateOutlet]
+  }`
 })
 export class DatatableRowDefComponent {
-  rowDef = inject(RowDefToken);
+  rowDef = inject(ROW_DEF_TOKEN);
   rowContext = {
-    ...this.rowDef.rowDefInternal,
-    disabled: this.rowDef.rowDefInternalDisabled
+    ...this.rowDef.rowDefInternal(),
+    disabled: this.rowDef.rowDefInternalDisabled()
   };
 }
 
@@ -56,20 +57,20 @@ export class DatatableRowDefDirective {
 export class DatatableRowDefInternalDirective implements OnInit {
   vc = inject(ViewContainerRef);
 
-  @Input() rowDefInternal!: RowDefContext;
-  @Input() rowDefInternalDisabled?: boolean;
+  readonly rowDefInternal = input.required<RowDefContext>();
+  readonly rowDefInternalDisabled = input<boolean>();
 
   ngOnInit(): void {
     this.vc.createEmbeddedView(
-      this.rowDefInternal.template,
+      this.rowDefInternal().template,
       {
-        ...this.rowDefInternal
+        ...this.rowDefInternal()
       },
       {
         injector: Injector.create({
           providers: [
             {
-              provide: RowDefToken,
+              provide: ROW_DEF_TOKEN,
               useValue: this
             }
           ]
@@ -78,10 +79,10 @@ export class DatatableRowDefInternalDirective implements OnInit {
     );
   }
 }
-const RowDefToken = new InjectionToken<DatatableRowDefInternalDirective>('RowDef');
-type RowDefContext = {
+const ROW_DEF_TOKEN = new InjectionToken<DatatableRowDefInternalDirective>('RowDef');
+interface RowDefContext {
   template: TemplateRef<unknown>;
   rowTemplate: TemplateRef<unknown>;
   row: RowOrGroup<unknown>;
   index: number;
-};
+}

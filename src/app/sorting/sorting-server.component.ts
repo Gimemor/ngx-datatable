@@ -1,15 +1,16 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
-  ColumnMode,
   DatatableComponent,
-  SortEvent,
+  SortPropDir,
   TableColumn
 } from 'projects/swimlane/ngx-datatable/src/public-api';
+
 import { Employee } from '../data.model';
 import { DataService } from '../data.service';
 
 @Component({
   selector: 'server-sorting-demo',
+  imports: [DatatableComponent],
   template: `
     <div>
       <h3>
@@ -25,25 +26,23 @@ import { DataService } from '../data.service';
       </h3>
       <ngx-datatable
         class="material"
-        [rows]="rows"
+        rowHeight="auto"
+        columnMode="force"
+        [rows]="rows()"
         [columns]="columns"
-        [columnMode]="ColumnMode.force"
         [headerHeight]="50"
         [footerHeight]="50"
-        rowHeight="auto"
         [externalSorting]="true"
-        [loadingIndicator]="loading"
-        (sort)="onSort($event)"
-      >
-      </ngx-datatable>
+        [loadingIndicator]="loading()"
+        (sortsChange)="onSort($event)"
+      />
     </div>
-  `,
-  imports: [DatatableComponent]
+  `
 })
 export class ServerSortingComponent {
-  loading = false;
+  readonly loading = signal(false);
 
-  rows: Employee[] = [];
+  readonly rows = signal<Employee[]>([]);
 
   columns: TableColumn[] = [
     { name: 'Company', sortable: true },
@@ -51,36 +50,34 @@ export class ServerSortingComponent {
     { name: 'Gender', sortable: true }
   ];
 
-  ColumnMode = ColumnMode;
-
   private dataService = inject(DataService);
 
   constructor() {
-    this.dataService.load('company.json').subscribe(data => {
-      this.rows = data.splice(0, 20);
-    });
+    this.dataService.load('company.json').subscribe(data => this.rows.set(data.splice(0, 20)));
   }
 
-  onSort(event: SortEvent) {
+  onSort(event: SortPropDir[]) {
     // event was triggered, start sort sequence
-    console.log('Sort Event', event);
-    this.loading = true;
+    this.loading.set(true);
     // emulate a server request with a timeout
-    setTimeout(() => {
-      const rows = [...this.rows];
-      // this is only for demo purposes, normally
-      // your server would return the result for
-      // you and you would just set the rows prop
-      const sort = event.sorts[0];
-      type sortProp = 'company' | 'name' | 'gender';
-      rows.sort(
-        (a, b) =>
-          a[sort.prop as sortProp].localeCompare(b[sort.prop as sortProp]) *
-          (sort.dir === 'desc' ? -1 : 1)
-      );
+    setTimeout(
+      () => {
+        const rows = [...this.rows()];
+        // this is only for demo purposes, normally
+        // your server would return the result for
+        // you and you would just set the rows prop
+        const sort = event[0];
+        type SortProp = 'company' | 'name' | 'gender';
+        rows.sort(
+          (a, b) =>
+            a[sort.prop as SortProp].localeCompare(b[sort.prop as SortProp]) *
+            (sort.dir === 'desc' ? -1 : 1)
+        );
 
-      this.rows = rows;
-      this.loading = false;
-    }, 1000);
+        this.rows.set(rows);
+        this.loading.set(false);
+      },
+      window.navigator.webdriver ? 0 : 1000
+    );
   }
 }

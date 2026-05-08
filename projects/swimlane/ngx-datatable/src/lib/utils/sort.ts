@@ -1,39 +1,39 @@
-import { getterForProp } from './column-prop-getters';
+import { SortableTableColumnInternal, TableColumnInternal } from '../types/internal.types';
 import { Group, SortDirection, SortPropDir, SortType } from '../types/public.types';
 import { TableColumnProp } from '../types/table-column.type';
-import { SortableTableColumnInternal, TableColumnInternal } from '../types/internal.types';
+import { getterForProp } from './column-prop-getters';
 
 /**
  * Gets the next sort direction
  */
-export function nextSortDir(
+export const nextSortDir = (
   sortType: SortType,
   current: SortDirection | 'desc' | 'asc' | undefined
-): SortDirection | undefined {
-  if (sortType === SortType.single) {
-    if (current === SortDirection.asc) {
-      return SortDirection.desc;
+): SortDirection | undefined => {
+  if (sortType === 'single') {
+    if (current === 'asc') {
+      return 'desc';
     } else {
-      return SortDirection.asc;
+      return 'asc';
     }
   } else {
     if (!current) {
-      return SortDirection.asc;
-    } else if (current === SortDirection.asc) {
-      return SortDirection.desc;
-    } else if (current === SortDirection.desc) {
+      return 'asc';
+    } else if (current === 'asc') {
+      return 'desc';
+    } else if (current === 'desc') {
       return undefined;
     }
     // avoid TS7030: Not all code paths return a value.
     return undefined;
   }
-}
+};
 
 /**
  * Adapted from fueld-ui on 6/216
  * https://github.com/FuelInteractive/fuel-ui/tree/master/src/pipes/OrderBy
  */
-export function orderByComparator(a: any, b: any): number {
+export const orderByComparator = (a: any, b: any): number => {
   if (a === null || typeof a === 'undefined') {
     a = 0;
   }
@@ -70,41 +70,48 @@ export function orderByComparator(a: any, b: any): number {
 
   // equal each other
   return 0;
-}
+};
 
 /**
  * creates a shallow copy of the `rows` input and returns the sorted copy. this function
  * does not sort the `rows` argument in place
  */
-export function sortRows<TRow>(
+export const sortRows = <TRow>(
   rows: TRow[],
   columns: TableColumnInternal[],
-  dirs: SortPropDir[]
-): TRow[] {
+  dirs: SortPropDir[],
+  sortOnGroupHeader?: SortPropDir
+): TRow[] => {
   if (!rows) {
     return [];
   }
-  if (!dirs || !dirs.length || !columns) {
+  if (!dirs?.length || !columns) {
     return [...rows];
   }
 
   const temp = [...rows];
-  const cols = columns.reduce((obj, col) => {
-    if (col.sortable) {
-      obj[col.prop] = col.comparator;
-    }
-    return obj;
-  }, {} as Record<TableColumnProp, SortableTableColumnInternal['comparator']>);
+  const cols = columns.reduce(
+    (obj, col) => {
+      if (col.sortable) {
+        obj[col.prop] = col.comparator;
+      }
+      return obj;
+    },
+    {} as Record<TableColumnProp, SortableTableColumnInternal['comparator'] | undefined>
+  );
 
   // cache valueGetter and compareFn so that they
   // do not need to be looked-up in the sort function body
   const cachedDirs = dirs.map(dir => {
-    const prop = dir.prop;
+    // When sorting on group header, override prop to 'key'
+    const prop = sortOnGroupHeader?.prop === dir.prop ? 'key' : dir.prop;
+    // SortDirs may contain columns that are not sortable, so compareFn would be undefined. In that case just return a comparator that returns 0.
+    const compareFn = cols[dir.prop] ?? (() => 0);
     return {
       prop,
       dir: dir.dir,
       valueGetter: getterForProp(prop),
-      compareFn: cols[prop]
+      compareFn
     };
   });
 
@@ -124,9 +131,9 @@ export function sortRows<TRow>(
       // as additional parameters are silently ignored. The whole row and sort
       // direction enable more complex sort logic.
       const comparison =
-        cachedDir.dir !== SortDirection.desc
-          ? cachedDir.compareFn(propA, propB, rowA, rowB, cachedDir.dir)
-          : -cachedDir.compareFn(propA, propB, rowA, rowB, cachedDir.dir);
+        cachedDir.dir !== 'desc'
+          ? cachedDir.compareFn(propA, propB, rowA, rowB)
+          : -cachedDir.compareFn(propA, propB, rowA, rowB);
 
       // Don't return 0 yet in case of needing to sort by next property
       if (comparison !== 0) {
@@ -136,21 +143,16 @@ export function sortRows<TRow>(
 
     return 0;
   });
-}
+};
 
-export function sortGroupedRows<TRow>(
+export const sortGroupedRows = <TRow>(
   groupedRows: Group<TRow>[],
   columns: TableColumnInternal[],
   dirs: SortPropDir[],
   sortOnGroupHeader: SortPropDir | undefined
-): Group<TRow>[] {
+): Group<TRow>[] => {
   if (sortOnGroupHeader) {
-    groupedRows = sortRows(groupedRows, columns, [
-      {
-        dir: sortOnGroupHeader.dir,
-        prop: 'key'
-      }
-    ]);
+    groupedRows = sortRows(groupedRows, columns, dirs, sortOnGroupHeader);
   }
   return groupedRows.map(group => ({ ...group, value: sortRows(group.value, columns, dirs) }));
-}
+};
